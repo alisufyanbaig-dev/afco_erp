@@ -21,7 +21,7 @@ class ChartOfAccountsSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'company', 'company_name', 'code', 'name', 'account_type', 
             'account_type_display', 'parent', 'parent_name', 'parent_code',
-            'is_control_account', 'is_active', 'description', 'level', 'full_path',
+            'is_group_account', 'is_active', 'description', 'level', 'full_path',
             'created_by', 'created_by_name', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'code', 'created_by', 'created_at', 'updated_at']
@@ -68,11 +68,11 @@ class ChartOfAccountsHierarchySerializer(serializers.ModelSerializer):
         model = ChartOfAccounts
         fields = [
             'id', 'code', 'name', 'account_type', 'account_type_display',
-            'is_control_account', 'is_active', 'children'
+            'is_group_account', 'is_active', 'children'
         ]
     
     def get_children(self, obj):
-        if obj.is_control_account:
+        if obj.is_group_account:
             children = obj.get_children()
             return ChartOfAccountsHierarchySerializer(children, many=True).data
         return []
@@ -218,10 +218,10 @@ class VoucherSerializer(serializers.ModelSerializer):
                     'line_entries': f'Account {account.code} - {account.name} does not belong to the voucher company.'
                 })
             
-            # Check if account is control account
-            if account and account.is_control_account:
+            # Check if account is group account
+            if account and account.is_group_account:
                 raise serializers.ValidationError({
-                    'line_entries': f'Cannot post entries to control account {account.code} - {account.name}.'
+                    'line_entries': f'Cannot post entries to group account {account.code} - {account.name}.'
                 })
         
         return attrs

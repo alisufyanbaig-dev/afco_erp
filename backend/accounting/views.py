@@ -19,7 +19,7 @@ class ChartOfAccountsListCreateView(generics.ListCreateAPIView):
     """
     serializer_class = ChartOfAccountsSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['account_type', 'is_control_account', 'is_active', 'parent']
+    filterset_fields = ['account_type', 'is_group_account', 'is_active', 'parent']
     search_fields = ['code', 'name', 'description']
     ordering_fields = ['code', 'name', 'created_at']
     ordering = ['code']

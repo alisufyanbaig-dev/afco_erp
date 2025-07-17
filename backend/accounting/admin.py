@@ -6,14 +6,14 @@ from .models import ChartOfAccounts, Voucher, VoucherLineEntry
 
 @admin.register(ChartOfAccounts)
 class ChartOfAccountsAdmin(admin.ModelAdmin):
-    list_display = ['code', 'name', 'account_type', 'parent_display', 'is_control_account', 'company', 'is_active']
-    list_filter = ['account_type', 'is_control_account', 'is_active', 'company']
+    list_display = ['code', 'name', 'account_type', 'parent_display', 'is_group_account', 'company', 'is_active']
+    list_filter = ['account_type', 'is_group_account', 'is_active', 'company']
     search_fields = ['code', 'name', 'description']
     autocomplete_fields = ['parent']
     readonly_fields = ['code', 'created_at', 'updated_at', 'level', 'full_path']
     fieldsets = (
         ('Basic Information', {
-            'fields': ('company', 'name', 'account_type', 'parent', 'is_control_account', 'description')
+            'fields': ('company', 'name', 'account_type', 'parent', 'is_group_account', 'description')
         }),
         ('Auto-Generated Fields', {
             'fields': ('code', 'level', 'full_path'),

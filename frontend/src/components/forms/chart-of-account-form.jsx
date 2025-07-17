@@ -21,7 +21,7 @@ export const ChartOfAccountForm = ({ open, onOpenChange, onSuccess, account = nu
     account_type: '',
     parent: '',
     company: '',
-    is_control_account: false,
+    is_group_account: false,
     is_active: true,
     description: ''
   });
@@ -40,18 +40,26 @@ export const ChartOfAccountForm = ({ open, onOpenChange, onSuccess, account = nu
         account_type: account.account_type || '',
         parent: account.parent || '',
         company: account.company || userActivity.current_company || '',
-        is_control_account: account.is_control_account || false,
+        is_group_account: account.is_group_account || false,
         is_active: account.is_active ?? true,
         description: account.description || ''
       });
     } else {
-      // Set company for new accounts
-      setFormData(prev => ({
-        ...prev,
-        company: userActivity.current_company || ''
-      }));
+      // Reset form for new accounts
+      setFormData({
+        name: '',
+        account_type: '',
+        parent: '',
+        company: userActivity.current_company || '',
+        is_group_account: false,
+        is_active: true,
+        description: ''
+      });
     }
-  }, [account, isEdit, userActivity.current_company]);
+    
+    // Clear errors when form is reset
+    setErrors({});
+  }, [account, isEdit, userActivity.current_company, open]);
 
   const loadAccountTypes = async () => {
     try {
@@ -66,8 +74,8 @@ export const ChartOfAccountForm = ({ open, onOpenChange, onSuccess, account = nu
 
   const loadParentAccounts = async () => {
     try {
-      // Load all accounts that can be parents (control accounts)
-      const response = await chartOfAccountsService.list({ is_control_account: true });
+      // Load all accounts that can be parents (group accounts)
+      const response = await chartOfAccountsService.list({ is_group_account: true });
       if (response.success) {
         const accounts = response.data.results || response.data;
         setParentAccounts(accounts);
@@ -107,7 +115,7 @@ export const ChartOfAccountForm = ({ open, onOpenChange, onSuccess, account = nu
     try {
       const response = await chartOfAccountsService.list({ 
         account_type: accountType,
-        is_control_account: true 
+        is_group_account: true 
       });
       if (response.success) {
         const accounts = response.data.results || response.data;
@@ -159,13 +167,22 @@ export const ChartOfAccountForm = ({ open, onOpenChange, onSuccess, account = nu
       }
 
       if (response.success) {
+        toast.success(isEdit ? 'Account updated successfully!' : 'Account created successfully!');
         onSuccess();
         onOpenChange(false);
+      } else {
+        toast.error(response.message || 'Failed to save account');
+        if (response.errors) {
+          setErrors(response.errors);
+        }
       }
     } catch (error) {
       console.error('Error saving account:', error);
+      toast.error('An error occurred while saving the account');
       if (error.errors) {
         setErrors(error.errors);
+      } else if (error.message) {
+        toast.error(error.message);
       }
     } finally {
       setLoading(false);
@@ -242,26 +259,26 @@ export const ChartOfAccountForm = ({ open, onOpenChange, onSuccess, account = nu
           ))}
         </select>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Only control accounts of the same type can be parents
+          Only group accounts of the same type can be parents
         </p>
       </div>
 
-      {/* Control Account Checkbox */}
+      {/* Group Account Checkbox */}
       <div>
         <label className="flex items-center space-x-2">
           <input
             type="checkbox"
-            name="is_control_account"
-            checked={formData.is_control_account}
+            name="is_group_account"
+            checked={formData.is_group_account}
             onChange={handleChange}
             className="rounded border-gray-300 dark:border-gray-600"
           />
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Control Account (Group Account)
+            Group Account
           </span>
         </label>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Control accounts can have sub-accounts but cannot have direct transactions
+          Group accounts can have sub-accounts but cannot have direct transactions
         </p>
       </div>
 

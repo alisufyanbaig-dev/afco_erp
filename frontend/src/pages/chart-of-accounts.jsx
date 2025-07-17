@@ -153,11 +153,11 @@ const ChartOfAccountsPage = () => {
       )
     },
     {
-      accessorKey: 'is_control_account',
-      header: 'Control Account',
+      accessorKey: 'is_group_account',
+      header: 'Group Account',
       cell: ({ row }) => (
-        <Badge variant={row.original.is_control_account ? 'default' : 'secondary'}>
-          {row.original.is_control_account ? 'Yes' : 'No'}
+        <Badge variant={row.original.is_group_account ? 'default' : 'secondary'}>
+          {row.original.is_group_account ? 'Yes' : 'No'}
         </Badge>
       )
     },

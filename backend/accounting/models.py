@@ -19,7 +19,7 @@ class ChartOfAccounts(models.Model):
     name = models.CharField(max_length=255)
     account_type = models.CharField(max_length=20, choices=ACCOUNT_TYPES)
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='sub_accounts')
-    is_control_account = models.BooleanField(default=False, help_text='Group/Control account that contains sub-accounts')
+    is_group_account = models.BooleanField(default=False, help_text='Group account that contains sub-accounts')
     is_active = models.BooleanField(default=True)
     description = models.TextField(blank=True, null=True)
     
@@ -55,23 +55,57 @@ class ChartOfAccounts(models.Model):
             if self.company != self.parent.company:
                 raise ValidationError('Parent account must be from the same company')
             
-            # Parent should be a control account
-            if not self.parent.is_control_account:
-                raise ValidationError('Parent account must be a control account')
+            # Parent should be a group account
+            if not self.parent.is_group_account:
+                raise ValidationError('Parent account must be a group account')
         
-        # Root accounts (no parent) should be control accounts if they will have children
-        if not self.parent and not self.is_control_account:
+        # Root accounts (no parent) should be group accounts if they will have children
+        if not self.parent and not self.is_group_account:
             # Check if this will be a main account type (1, 2, 3, 4)
             if self.code and len(self.code.split('-')) == 1:
-                self.is_control_account = True
+                # Only auto-set group account for new accounts, not updates
+                if not self.pk:
+                    self.is_group_account = True
+        
+        # Prevent changing group account to non-group if it has sub-accounts
+        if self.pk and not self.is_group_account:
+            if self.sub_accounts.exists():
+                raise ValidationError('Cannot change group account to non-group account because it has sub-accounts')
+        
+        # Prevent circular references in parent-child relationships
+        if self.parent and self.pk:
+            current_parent = self.parent
+            while current_parent:
+                if current_parent.pk == self.pk:
+                    raise ValidationError('Cannot set parent account - this would create a circular reference')
+                current_parent = current_parent.parent
     
     def save(self, *args, **kwargs):
-        # Auto-generate code if not provided
-        if not self.code:
+        # Check if this is an update and parent has changed
+        parent_changed = False
+        old_parent = None
+        
+        if self.pk:
+            # Get the current instance from database
+            try:
+                old_instance = ChartOfAccounts.objects.get(pk=self.pk)
+                old_parent = old_instance.parent
+                parent_changed = old_instance.parent != self.parent
+            except ChartOfAccounts.DoesNotExist:
+                pass
+        
+        # Auto-generate code if not provided or parent changed
+        if not self.code or parent_changed:
             self.code = self._generate_account_code()
         
         self.clean()
         super().save(*args, **kwargs)
+        
+        # If parent changed, recalculate codes for all descendants
+        # This handles both: 1) When this account moves to a new parent
+        #                   2) When this account has children and its own code changed
+        if parent_changed or (self.pk and self.sub_accounts.exists()):
+            self._recalculate_descendant_codes()
     
     def _generate_account_code(self):
         """Generate unique account code based on hierarchy"""
@@ -124,6 +158,24 @@ class ChartOfAccounts(models.Model):
             
             return f"{parent_code}-{next_number}"
     
+    def _recalculate_descendant_codes(self):
+        """Recalculate account codes for all descendants when hierarchy changes"""
+        # Get all direct children
+        children = self.sub_accounts.all().order_by('id')  # Order by ID to maintain consistency
+        
+        for child in children:
+            # Generate new code for each child
+            old_code = child.code
+            new_code = child._generate_account_code()
+            
+            if old_code != new_code:
+                # Update the child's code without triggering save recursion
+                ChartOfAccounts.objects.filter(pk=child.pk).update(code=new_code)
+                
+                # Refresh the child instance and recalculate its descendants
+                child.refresh_from_db()
+                child._recalculate_descendant_codes()
+    
     @property
     def level(self):
         """Return the hierarchy level (0 for root, 1 for first level sub, etc.)"""
@@ -149,13 +201,18 @@ class ChartOfAccounts(models.Model):
         return descendants
     
     def can_be_deleted(self):
-        """Check if account can be deleted (no sub-accounts and no transactions)"""
-        if self.sub_accounts.exists():
-            return False, "Cannot delete account with sub-accounts"
-        
+        """Check if account can be deleted (considering cascade deletion)"""
         # TODO: Add check for transactions when transaction models are created
         # if self.transactions.exists():
         #     return False, "Cannot delete account with transactions"
+        
+        # Check if any sub-accounts have transactions (would prevent cascade deletion)
+        sub_accounts = self.get_descendants()
+        for sub_account in sub_accounts:
+            # TODO: Check if sub_account has transactions
+            # if sub_account.transactions.exists():
+            #     return False, f"Cannot delete account because sub-account '{sub_account.name}' has transactions"
+            pass
         
         return True, "Account can be deleted"
     
@@ -376,9 +433,9 @@ class VoucherLineEntry(models.Model):
         if self.debit_amount == 0 and self.credit_amount == 0:
             raise ValidationError('Line entry must have either debit or credit amount')
         
-        # Control accounts cannot have direct entries
-        if self.account and self.account.is_control_account:
-            raise ValidationError('Cannot post entries to control accounts')
+        # Group accounts cannot have direct entries
+        if self.account and self.account.is_group_account:
+            raise ValidationError('Cannot post entries to group accounts')
     
     def save(self, *args, **kwargs):
         # Auto-assign line number if not provided
