@@ -2,6 +2,7 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.db import models
 from django.utils import timezone
 from django.core.validators import RegexValidator
+from django.core.exceptions import ValidationError
 
 
 class UserManager(BaseUserManager):
@@ -111,7 +112,7 @@ class Company(models.Model):
     ], default='private_limited')
     
     # System fields
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='created_companies')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_companies')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
@@ -133,11 +134,9 @@ class FinancialYear(models.Model):
     end_date = models.DateField()
     
     # System fields
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    is_active = models.BooleanField(default=True)
-    is_current = models.BooleanField(default=False, help_text='Mark as current active financial year')
     
     class Meta:
         db_table = 'financial_years'
@@ -155,17 +154,43 @@ class FinancialYear(models.Model):
     def __str__(self):
         return f"{self.company.name} - {self.name}"
     
-    def save(self, *args, **kwargs):
-        # Ensure only one current financial year per company
-        if self.is_current:
-            FinancialYear.objects.filter(
-                company=self.company, 
-                is_current=True
-            ).exclude(id=self.id).update(is_current=False)
-        
-        super().save(*args, **kwargs)
     
     @property
     def duration_months(self):
         """Calculate duration in months"""
-        return (self.end_date.year - self.start_date.year) * 12 + (self.end_date.month - self.start_date.month)
+        months = (self.end_date.year - self.start_date.year) * 12 + (self.end_date.month - self.start_date.month)
+        
+        # Add 1 if the end date is at or after the start date of the month
+        if self.end_date.day >= self.start_date.day:
+            months += 1
+            
+        return months
+
+
+class UserActivity(models.Model):
+    """
+    Model to track user's current activated company and financial year
+    """
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='activity')
+    current_company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True)
+    current_financial_year = models.ForeignKey(FinancialYear, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'user_activity'
+        verbose_name = 'User Activity'
+        verbose_name_plural = 'User Activities'
+    
+    def __str__(self):
+        return f"{self.user.email} - {self.current_company} - {self.current_financial_year}"
+    
+    def clean(self):
+        """Validate that financial year belongs to the current company"""
+        if self.current_financial_year and self.current_company:
+            if self.current_financial_year.company != self.current_company:
+                raise ValidationError('Financial year must belong to the current company')
+    
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)

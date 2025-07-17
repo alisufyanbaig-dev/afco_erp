@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authService } from '../services/auth';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { authService } from '../services/api';
 
 const AuthContext = createContext();
 
@@ -15,19 +16,20 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const token = authService.getToken();
-        if (token && authService.isAuthenticated()) {
+        if (authService.isAuthenticated()) {
           const currentUser = authService.getCurrentUser();
           setUser(currentUser);
           setIsAuthenticated(true);
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
-        authService.logout();
+        await authService.logout();
       } finally {
         setLoading(false);
       }
@@ -40,9 +42,16 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       const response = await authService.login(credentials);
-      setUser(response.user);
-      setIsAuthenticated(true);
-      return response;
+      if (response.success && response.data) {
+        setUser(response.data.user);
+        setIsAuthenticated(true);
+        
+        // Navigate to the intended page or dashboard
+        const from = location.state?.from?.pathname || '/dashboard';
+        navigate(from, { replace: true });
+        
+        return response;
+      }
     } catch (error) {
       setUser(null);
       setIsAuthenticated(false);
@@ -53,9 +62,34 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    // Clear tokens and user data from browser storage
     authService.logout();
     setUser(null);
     setIsAuthenticated(false);
+    // Navigate to login page after logout
+    navigate('/login', { replace: true });
+  };
+
+  const register = async (userData) => {
+    try {
+      setLoading(true);
+      const response = await authService.register(userData);
+      if (response.success && response.data) {
+        setUser(response.data.user);
+        setIsAuthenticated(true);
+        
+        // Navigate to dashboard after successful registration
+        navigate('/dashboard', { replace: true });
+        
+        return response;
+      }
+    } catch (error) {
+      setUser(null);
+      setIsAuthenticated(false);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const value = {
@@ -64,6 +98,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     logout,
+    register,
   };
 
   return (

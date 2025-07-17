@@ -8,11 +8,10 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const LoginPage = () => {
   const [credentials, setCredentials] = useState({
-    username: '',
+    email: '',
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
 
@@ -22,18 +21,17 @@ const LoginPage = () => {
       ...prev,
       [name]: value,
     }));
-    if (error) setError('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
 
     try {
       await login(credentials);
     } catch (error) {
-      setError(error.message || 'Login failed. Please check your credentials.');
+      // Error handling is done by the API service with toasts
+      console.error('Login error:', error);
     } finally {
       setLoading(false);
     }
@@ -51,25 +49,18 @@ const LoginPage = () => {
           <CardDescription>Sign in to your account</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {error && (
-            <div className="flex items-center space-x-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-              <AlertCircle className="h-4 w-4 text-destructive" />
-              <span className="text-sm text-destructive">{error}</span>
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="email">Email</Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  id="username"
-                  name="username"
-                  type="text"
-                  value={credentials.username}
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={credentials.email}
                   onChange={handleChange}
-                  placeholder="Enter your username"
+                  placeholder="Enter your email"
                   className="pl-10"
                   required
                 />

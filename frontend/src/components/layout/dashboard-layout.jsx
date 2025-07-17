@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useNavigate, useLocation } from "react-router-dom"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { 
@@ -10,6 +11,11 @@ import {
   SidebarNavItem, 
   SidebarNavGroup 
 } from "@/components/ui/sidebar"
+import { useAuth } from "@/contexts/AuthContext"
+import { useUI } from "@/contexts/UIContext"
+import { useTheme } from "@/contexts/ThemeContext"
+import { useUserActivity } from "@/contexts/UserActivityContext"
+import ActivityBadge from "@/components/ui/activity-badge"
 import { 
   Menu, 
   X, 
@@ -21,7 +27,9 @@ import {
   Users, 
   BarChart3, 
   Settings, 
-  User,
+  LogOut,
+  Sun,
+  Moon,
   Receipt,
   DollarSign,
   FileText,
@@ -30,7 +38,13 @@ import {
   Tag,
   Truck,
   Warehouse,
-  Archive
+  Archive,
+  Building,
+  Calendar,
+  Banknote,
+  Landmark,
+  BookOpen,
+  PieChart
 } from "lucide-react"
 
 const navigationItems = [
@@ -43,11 +57,9 @@ const navigationItems = [
     title: "Accounting",
     icon: Calculator,
     children: [
-      { title: "Chart of Accounts", icon: Calculator, href: "/accounting/accounts" },
-      { title: "Transactions", icon: Receipt, href: "/accounting/transactions" },
-      { title: "Invoices", icon: FileText, href: "/accounting/invoices" },
-      { title: "Payments", icon: CreditCard, href: "/accounting/payments" },
-      { title: "Financial Reports", icon: TrendingUp, href: "/accounting/reports" },
+      { title: "Chart of Accounts", icon: BookOpen, href: "/chart-of-accounts" },
+      { title: "Vouchers", icon: Receipt, href: "/vouchers" },
+      { title: "Financial Reports", icon: PieChart, href: "/accounting/reports" },
     ],
   },
   {
@@ -79,20 +91,31 @@ const navigationItems = [
   {
     title: "Settings",
     icon: Settings,
-    href: "/settings",
-  },
-  {
-    title: "Profile",
-    icon: User,
-    href: "/profile",
+    children: [
+      { title: "Companies", icon: Building, href: "/companies" },
+      { title: "Financial Years", icon: Calendar, href: "/financial-years" },
+      { title: "General Settings", icon: Settings, href: "/settings" },
+    ],
   },
 ]
 
-export function DashboardLayout({ children, pathname, navigate }) {
+export function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = React.useState(false)
   const [expandedItems, setExpandedItems] = React.useState({})
+  const { logout } = useAuth()
+  const { sidebarCollapsed, setSidebarCollapsed } = useUI()
+  const { theme, toggleTheme } = useTheme()
+  const { userActivity } = useUserActivity()
+  const [isHovered, setIsHovered] = React.useState(false)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const pathname = location.pathname
 
   const toggleExpanded = (title) => {
+    // Don't expand if sidebar is collapsed and not hovered
+    if (sidebarCollapsed && !isHovered) {
+      return
+    }
     setExpandedItems(prev => ({
       ...prev,
       [title]: !prev[title]
@@ -104,8 +127,24 @@ export function DashboardLayout({ children, pathname, navigate }) {
     setSidebarOpen(false)
   }
 
+  const handleLogout = () => {
+    logout()
+  }
+
+  const handleThemeToggle = () => {
+    if (toggleTheme) {
+      toggleTheme();
+    }
+  }
+
+  const toggleSidebarCollapse = () => {
+    setSidebarCollapsed(!sidebarCollapsed)
+  }
+
+  const shouldShowText = !sidebarCollapsed || isHovered
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background dark:bg-gray-900">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div 
@@ -115,53 +154,81 @@ export function DashboardLayout({ children, pathname, navigate }) {
       )}
       
       {/* Sidebar */}
-      <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out lg:translate-x-0",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
-        <Sidebar>
-          <SidebarHeader>
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-blue-600">AFCO ERP</h2>
-              <Button 
-                variant="ghost" 
-                size="icon"
-                className="lg:hidden"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
+      <div 
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 transform transition-all duration-300 ease-in-out lg:translate-x-0",
+          sidebarCollapsed && !isHovered ? "w-16" : "w-64",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full",
+          isHovered && sidebarCollapsed ? "shadow-lg" : ""
+        )}
+        onMouseEnter={() => sidebarCollapsed && setIsHovered(true)}
+        onMouseLeave={() => sidebarCollapsed && setIsHovered(false)}
+      >
+        <Sidebar className="overflow-hidden bg-white dark:bg-gray-800">
+          <SidebarHeader className={cn(
+            "transition-all duration-300",
+            sidebarCollapsed && !isHovered ? "px-0" : "px-4"
+          )}>
+            {sidebarCollapsed && !isHovered ? (
+              <div className="flex items-center justify-center w-full h-full">
+                <h2 className="text-xl font-bold text-blue-600 dark:text-blue-400">A</h2>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between w-full">
+                <h2 className="text-xl font-bold text-blue-600 dark:text-blue-400 truncate">AFCO ERP</h2>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className="lg:hidden"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <X className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+                </Button>
+              </div>
+            )}
           </SidebarHeader>
           
-          <SidebarContent>
+          <SidebarContent className={cn(
+            "transition-all duration-300",
+            sidebarCollapsed && !isHovered ? "p-2" : "p-4"
+          )}>
             <SidebarNav>
               {navigationItems.map((item) => (
                 <SidebarNavGroup key={item.title}>
                   {item.children ? (
                     <div>
                       <SidebarNavItem
-                        className="cursor-pointer"
+                        className={cn(
+                          "cursor-pointer transition-all duration-300",
+                          sidebarCollapsed && !isHovered ? "justify-center px-2" : "px-3"
+                        )}
                         onClick={() => toggleExpanded(item.title)}
                       >
-                        <item.icon className="h-4 w-4 mr-3" />
-                        {item.title}
-                        <ChevronDown className={cn(
-                          "h-4 w-4 ml-auto transition-transform",
-                          expandedItems[item.title] ? "rotate-180" : ""
+                        <item.icon className={cn(
+                          "h-4 w-4 transition-all duration-300 text-gray-700 dark:text-gray-300",
+                          sidebarCollapsed && !isHovered ? "mr-0" : "mr-3"
                         )} />
+                        {shouldShowText && (
+                          <>
+                            <span className="truncate">{item.title}</span>
+                            <ChevronDown className={cn(
+                              "h-4 w-4 ml-auto transition-transform flex-shrink-0 text-gray-700 dark:text-gray-300",
+                              expandedItems[item.title] ? "rotate-180" : ""
+                            )} />
+                          </>
+                        )}
                       </SidebarNavItem>
-                      {expandedItems[item.title] && (
+                      {expandedItems[item.title] && shouldShowText && (
                         <div className="ml-6 mt-1 space-y-1">
                           {item.children.map((child) => (
                             <SidebarNavItem
                               key={child.href}
-                              className="cursor-pointer text-sm"
+                              className="cursor-pointer text-sm px-3"
                               active={pathname === child.href}
                               onClick={() => handleNavigation(child.href)}
                             >
-                              <child.icon className="h-3 w-3 mr-2" />
-                              {child.title}
+                              <child.icon className="h-3 w-3 mr-2 flex-shrink-0 text-gray-700 dark:text-gray-300" />
+                              <span className="truncate">{child.title}</span>
                             </SidebarNavItem>
                           ))}
                         </div>
@@ -169,12 +236,20 @@ export function DashboardLayout({ children, pathname, navigate }) {
                     </div>
                   ) : (
                     <SidebarNavItem
-                      className="cursor-pointer"
+                      className={cn(
+                        "cursor-pointer transition-all duration-300",
+                        sidebarCollapsed && !isHovered ? "justify-center px-2" : "px-3"
+                      )}
                       active={pathname === item.href}
                       onClick={() => handleNavigation(item.href)}
                     >
-                      <item.icon className="h-4 w-4 mr-3" />
-                      {item.title}
+                      <item.icon className={cn(
+                        "h-4 w-4 transition-all duration-300 text-gray-700 dark:text-gray-300",
+                        sidebarCollapsed && !isHovered ? "mr-0" : "mr-3"
+                      )} />
+                      {shouldShowText && (
+                        <span className="truncate">{item.title}</span>
+                      )}
                     </SidebarNavItem>
                   )}
                 </SidebarNavGroup>
@@ -185,36 +260,55 @@ export function DashboardLayout({ children, pathname, navigate }) {
       </div>
 
       {/* Main content */}
-      <div className="lg:ml-64">
+      <div className={cn(
+        "transition-all duration-300 ease-in-out",
+        sidebarCollapsed ? "lg:ml-16" : "lg:ml-64"
+      )}>
         {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-4 py-3 lg:px-6">
+        <header className="sticky top-0 z-40 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 lg:px-6">
           <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-            
             <div className="flex items-center space-x-4">
-              <h1 className="text-xl font-semibold text-gray-900">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                className="hidden lg:flex"
+                onClick={toggleSidebarCollapse}
+              >
+                <Menu className="h-4 w-4 text-gray-700 dark:text-gray-300" />
+              </Button>
+              <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
                 AFCO ERP Dashboard
               </h1>
             </div>
             
             <div className="flex items-center space-x-4">
-              <Button variant="outline" size="sm">
-                <User className="h-4 w-4 mr-2" />
-                Profile
+              <ActivityBadge
+                company={userActivity.current_company_name}
+                financialYear={userActivity.current_financial_year_name}
+                loading={userActivity.loading || userActivity.activating}
+              />
+              <Button variant="outline" size="sm" onClick={handleThemeToggle}>
+                {theme === 'dark' ? <Sun className="h-4 w-4 mr-2 text-gray-700 dark:text-gray-300" /> : <Moon className="h-4 w-4 mr-2 text-gray-700 dark:text-gray-300" />}
+                {theme === 'dark' ? 'Light' : 'Dark'}
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2 text-gray-700 dark:text-gray-300" />
+                Logout
               </Button>
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-4 lg:p-6">
+        <main className="flex-1 p-4 lg:p-6 bg-gray-50 dark:bg-gray-900">
           {children}
         </main>
       </div>

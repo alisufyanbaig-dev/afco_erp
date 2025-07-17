@@ -3,12 +3,12 @@ import { cn } from "@/lib/utils"
 import { cva } from "class-variance-authority"
 
 const sidebarVariants = cva(
-  "flex h-full w-64 flex-col border-r bg-background",
+  "flex h-full w-full flex-col border-r bg-background dark:bg-gray-800",
   {
     variants: {
       variant: {
-        default: "border-border",
-        inset: "border-none bg-sidebar",
+        default: "border-border dark:border-gray-700",
+        inset: "border-none bg-sidebar dark:bg-gray-800",
       },
     },
     defaultVariants: {
@@ -29,7 +29,7 @@ Sidebar.displayName = "Sidebar"
 const SidebarHeader = React.forwardRef(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex items-center justify-between p-4 border-b", className)}
+    className={cn("flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700", className)}
     {...props}
   />
 ))
@@ -47,7 +47,7 @@ SidebarContent.displayName = "SidebarContent"
 const SidebarFooter = React.forwardRef(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("p-4 border-t", className)}
+    className={cn("flex items-center justify-between h-16 px-4 border-t border-gray-200 dark:border-gray-700", className)}
     {...props}
   />
 ))
@@ -75,10 +75,10 @@ const SidebarNavItem = React.forwardRef(({ className, active, ...props }, ref) =
   <div
     ref={ref}
     className={cn(
-      "flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
+      "flex items-center py-2 text-sm font-medium rounded-md transition-colors",
       active 
-        ? "bg-blue-100 text-blue-900" 
-        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100",
+        ? "bg-blue-100 text-blue-900 dark:bg-blue-900 dark:text-blue-100" 
+        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700",
       className
     )}
     {...props}

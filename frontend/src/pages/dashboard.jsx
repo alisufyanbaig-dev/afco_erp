@@ -21,7 +21,7 @@ const stats = [
     description: "+20.1% from last month",
     icon: DollarSign,
     trend: "up",
-    color: "text-green-600"
+    color: "text-green-600 dark:text-green-400"
   },
   {
     title: "Active Customers",
@@ -29,7 +29,7 @@ const stats = [
     description: "+180 from last month",
     icon: Users,
     trend: "up",
-    color: "text-blue-600"
+    color: "text-blue-600 dark:text-blue-400"
   },
   {
     title: "Products in Stock",
@@ -37,7 +37,7 @@ const stats = [
     description: "+19% from last month",
     icon: Package,
     trend: "up",
-    color: "text-purple-600"
+    color: "text-purple-600 dark:text-purple-400"
   },
   {
     title: "Growth Rate",
@@ -45,7 +45,7 @@ const stats = [
     description: "+4.5% from last month",
     icon: TrendingUp,
     trend: "up",
-    color: "text-orange-600"
+    color: "text-orange-600 dark:text-orange-400"
   },
 ]
 
@@ -93,8 +93,8 @@ export default function Dashboard() {
       {/* Welcome Section */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Welcome back!</h2>
-          <p className="text-gray-500">
+          <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Welcome back!</h2>
+          <p className="text-gray-500 dark:text-gray-400">
             Here's what's happening with your business today.
           </p>
         </div>
@@ -111,14 +111,14 @@ export default function Dashboard() {
         {stats.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+              <CardTitle className="text-sm font-medium text-gray-900 dark:text-white">
                 {stat.title}
               </CardTitle>
               <stat.icon className={`h-4 w-4 ${stat.color}`} />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground flex items-center">
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">{stat.value}</div>
+              <p className="text-xs text-muted-foreground dark:text-gray-400 flex items-center">
                 {stat.trend === "up" ? (
                   <ArrowUpRight className="h-4 w-4 text-green-500 mr-1" />
                 ) : (
@@ -143,11 +143,11 @@ export default function Dashboard() {
           <CardContent>
             <div className="space-y-4">
               {recentTransactions.map((transaction) => (
-                <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div key={transaction.id} className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
                   <div className="flex items-center space-x-3">
                     <div className="flex flex-col">
-                      <p className="text-sm font-medium">{transaction.customer}</p>
-                      <p className="text-xs text-muted-foreground">{transaction.type} • {transaction.date}</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">{transaction.customer}</p>
+                      <p className="text-xs text-muted-foreground dark:text-gray-400">{transaction.type} • {transaction.date}</p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -158,7 +158,7 @@ export default function Dashboard() {
                     }>
                       {transaction.status}
                     </Badge>
-                    <span className="text-sm font-medium">{transaction.amount}</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">{transaction.amount}</span>
                   </div>
                 </div>
               ))}

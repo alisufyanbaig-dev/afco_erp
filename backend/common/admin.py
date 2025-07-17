@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
-from .models import User, Company, FinancialYear
+from .models import User, Company, FinancialYear, UserActivity
 
 
 class CustomUserCreationForm(UserCreationForm):
@@ -76,17 +76,14 @@ class CompanyAdmin(admin.ModelAdmin):
 
 @admin.register(FinancialYear)
 class FinancialYearAdmin(admin.ModelAdmin):
-    list_display = ('name', 'company', 'start_date', 'end_date', 'is_current', 'is_active')
-    list_filter = ('company', 'is_current', 'is_active', 'start_date')
+    list_display = ('name', 'company', 'start_date', 'end_date')
+    list_filter = ('company', 'start_date')
     search_fields = ('name', 'company__name')
     readonly_fields = ('created_at', 'updated_at', 'duration_months')
     
     fieldsets = (
         ('Basic Information', {
             'fields': ('company', 'name', 'start_date', 'end_date')
-        }),
-        ('Status', {
-            'fields': ('is_current', 'is_active')
         }),
         ('System Information', {
             'fields': ('created_by', 'created_at', 'updated_at', 'duration_months'),
@@ -102,3 +99,24 @@ class FinancialYearAdmin(admin.ModelAdmin):
     def duration_months(self, obj):
         return f"{obj.duration_months} months"
     duration_months.short_description = 'Duration'
+
+
+@admin.register(UserActivity)
+class UserActivityAdmin(admin.ModelAdmin):
+    list_display = ('user', 'current_company', 'current_financial_year', 'updated_at')
+    list_filter = ('current_company', 'updated_at')
+    search_fields = ('user__email', 'current_company__name', 'current_financial_year__name')
+    readonly_fields = ('created_at', 'updated_at')
+    
+    fieldsets = (
+        ('User Information', {
+            'fields': ('user',),
+        }),
+        ('Current Activity', {
+            'fields': ('current_company', 'current_financial_year'),
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',),
+        }),
+    )
