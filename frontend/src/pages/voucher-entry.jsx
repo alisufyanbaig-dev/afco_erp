@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, Save, Calculator, Banknote, Landmark, FileText, Search, X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -10,14 +10,19 @@ import { useUserActivity } from '@/contexts/UserActivityContext';
 import toast from 'react-hot-toast';
 
 const VoucherEntryPage = () => {
-  const { type } = useParams(); // cash, bank, or journal
+  const { type, id } = useParams(); // cash, bank, or journal for create; id for edit
   const navigate = useNavigate();
   const { userActivity } = useUserActivity();
+  const isEditMode = Boolean(id);
   
   const [loading, setLoading] = useState(false);
+  const [loadingVoucher, setLoadingVoucher] = useState(isEditMode);
+  const [originalVoucher, setOriginalVoucher] = useState(null);
   const [accounts, setAccounts] = useState([]);
   const [accountSearch, setAccountSearch] = useState('');
   const [showAccountDropdown, setShowAccountDropdown] = useState(null);
+  const [selectedAccountIndex, setSelectedAccountIndex] = useState(-1);
+  const dropdownRef = useRef(null);
   
   // Calculate appropriate default date
   const getDefaultDate = () => {
@@ -40,7 +45,7 @@ const VoucherEntryPage = () => {
   };
 
   const [voucherData, setVoucherData] = useState({
-    voucher_type: type,
+    voucher_type: type || '',
     voucher_date: getDefaultDate(),
     narration: '',
     reference: '',
@@ -78,12 +83,16 @@ const VoucherEntryPage = () => {
     }
   };
 
-  const config = voucherConfig[type] || voucherConfig.journal;
+  const currentType = type || voucherData.voucher_type || 'journal';
+  const config = voucherConfig[currentType] || voucherConfig.journal;
   const Icon = config.icon;
 
   useEffect(() => {
     loadAccounts();
-  }, []);
+    if (isEditMode && id) {
+      loadVoucherForEdit(id);
+    }
+  }, [isEditMode, id]);
 
   // Update voucher date when financial year changes
   useEffect(() => {
@@ -95,12 +104,47 @@ const VoucherEntryPage = () => {
 
   const loadAccounts = async () => {
     try {
-      const response = await chartOfAccountsService.list({ is_active: true });
+      // Load only non-group accounts that are active (accounts that can have transactions)
+      const response = await chartOfAccountsService.list({ 
+        is_active: true, 
+        is_group_account: false 
+      });
       if (response.success) {
         setAccounts(response.data.results || response.data);
       }
     } catch (error) {
       console.error('Error loading accounts:', error);
+    }
+  };
+
+  const loadVoucherForEdit = async (voucherId) => {
+    try {
+      setLoadingVoucher(true);
+      const response = await voucherService.get(voucherId);
+      
+      if (response.success) {
+        const voucher = response.data;
+        setOriginalVoucher(voucher);
+        
+        // Set form data from voucher
+        setVoucherData({
+          voucher_type: voucher.voucher_type,
+          voucher_date: voucher.voucher_date,
+          narration: voucher.narration,
+          reference: voucher.reference || '',
+          line_entries: voucher.line_entries.map(entry => ({
+            account: entry.account,
+            debit_amount: entry.debit_amount || '',
+            credit_amount: entry.credit_amount || ''
+          }))
+        });
+      }
+    } catch (error) {
+      console.error('Error loading voucher:', error);
+      toast.error('Failed to load voucher data');
+      navigate('/vouchers');
+    } finally {
+      setLoadingVoucher(false);
     }
   };
 
@@ -161,6 +205,50 @@ const VoucherEntryPage = () => {
     handleLineEntryChange(lineIndex, 'account', account.id);
     setShowAccountDropdown(null);
     setAccountSearch('');
+    setSelectedAccountIndex(-1);
+  };
+
+  const scrollToSelectedItem = (index) => {
+    if (dropdownRef.current && index >= 0) {
+      const items = dropdownRef.current.querySelectorAll('[data-account-item]');
+      if (items[index]) {
+        items[index].scrollIntoView({
+          block: 'nearest',
+          behavior: 'smooth'
+        });
+      }
+    }
+  };
+
+  const handleKeyNavigation = (e, lineIndex, filteredAccounts) => {
+    if (showAccountDropdown !== lineIndex || filteredAccounts.length === 0) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        const nextIndex = selectedAccountIndex < filteredAccounts.length - 1 ? selectedAccountIndex + 1 : 0;
+        setSelectedAccountIndex(nextIndex);
+        scrollToSelectedItem(nextIndex);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        const prevIndex = selectedAccountIndex > 0 ? selectedAccountIndex - 1 : filteredAccounts.length - 1;
+        setSelectedAccountIndex(prevIndex);
+        scrollToSelectedItem(prevIndex);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (selectedAccountIndex >= 0 && selectedAccountIndex < filteredAccounts.length) {
+          selectAccount(lineIndex, filteredAccounts[selectedAccountIndex]);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setShowAccountDropdown(null);
+        setAccountSearch('');
+        setSelectedAccountIndex(-1);
+        break;
+    }
   };
 
   const getSelectedAccountName = (accountId) => {
@@ -183,6 +271,17 @@ const VoucherEntryPage = () => {
   const { totalDebit, totalCredit, isBalanced } = calculateTotals();
 
   const validateForm = () => {
+    // Check if user has activated company and financial year
+    if (!userActivity.current_company) {
+      toast.error('Please activate a company first');
+      return false;
+    }
+
+    if (!userActivity.current_financial_year) {
+      toast.error('Please activate a financial year first');
+      return false;
+    }
+
     if (!voucherData.narration.trim()) {
       toast.error('Narration is required');
       return false;
@@ -229,23 +328,47 @@ const VoucherEntryPage = () => {
           credit_amount: parseFloat(entry.credit_amount) || 0
         }));
 
+      // Ensure company and financial year are included from user activity
       const submitData = {
         ...voucherData,
+        company: userActivity.current_company,
+        financial_year: userActivity.current_financial_year,
         line_entries: filteredLineEntries
       };
 
-      const response = await voucherService.create(submitData);
-      if (response.success) {
-        toast.success('Voucher created successfully!');
-        navigate('/vouchers');
+      let response;
+      if (isEditMode) {
+        response = await voucherService.update(id, submitData);
+        if (response.success) {
+          toast.success('Voucher updated successfully!');
+          navigate('/vouchers');
+        }
+      } else {
+        response = await voucherService.create(submitData);
+        if (response.success) {
+          toast.success('Voucher created successfully!');
+          navigate('/vouchers');
+        }
       }
     } catch (error) {
-      console.error('Error creating voucher:', error);
-      toast.error('Failed to create voucher');
+      console.error(`Error ${isEditMode ? 'updating' : 'creating'} voucher:`, error);
+      toast.error(`Failed to ${isEditMode ? 'update' : 'create'} voucher`);
     } finally {
       setLoading(false);
     }
   };
+
+  // Show loading state when loading voucher for edit
+  if (loadingVoucher) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading voucher...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -264,8 +387,12 @@ const VoucherEntryPage = () => {
               <Icon className={`h-6 w-6 ${config.color}`} />
             </div>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">{config.title}</h1>
-              <p className="text-gray-600 dark:text-gray-400">{config.subtitle}</p>
+              <h1 className="text-3xl font-bold tracking-tight">
+                {isEditMode ? `Edit ${config.title}` : config.title}
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">
+                {isEditMode ? `Edit ${config.subtitle.toLowerCase()}` : config.subtitle}
+              </p>
             </div>
           </div>
         </div>
@@ -352,8 +479,16 @@ const VoucherEntryPage = () => {
                       onChange={(e) => {
                         setAccountSearch(e.target.value);
                         setShowAccountDropdown(index);
+                        setSelectedAccountIndex(-1);
                       }}
-                      onFocus={() => setShowAccountDropdown(index)}
+                      onFocus={() => {
+                        setShowAccountDropdown(index);
+                        setSelectedAccountIndex(-1);
+                      }}
+                      onKeyDown={(e) => {
+                        const filteredAccounts = getFilteredAccounts(accountSearch);
+                        handleKeyNavigation(e, index, filteredAccounts);
+                      }}
                       placeholder="Search accounts..."
                       className="pr-8"
                     />
@@ -372,26 +507,51 @@ const VoucherEntryPage = () => {
                   </div>
                   
                   {/* Account Dropdown */}
-                  {showAccountDropdown === index && (
-                    <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                      {getFilteredAccounts(accountSearch).map((account) => (
-                        <button
-                          key={account.id}
-                          type="button"
-                          onClick={() => selectAccount(index, account)}
-                          className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700"
-                        >
-                          <div className="font-medium text-sm">{account.code} - {account.name}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">{account.account_type_display}</div>
-                        </button>
-                      ))}
-                      {getFilteredAccounts(accountSearch).length === 0 && (
-                        <div className="px-3 py-2 text-gray-500 dark:text-gray-400 text-sm">
-                          No accounts found
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {showAccountDropdown === index && (() => {
+                    const filteredAccounts = getFilteredAccounts(accountSearch);
+                    return (
+                      <div ref={dropdownRef} className="absolute top-full left-0 right-0 z-10 mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                        {filteredAccounts.map((account, accountIndex) => (
+                          <button
+                            key={account.id}
+                            type="button"
+                            data-account-item
+                            onClick={() => selectAccount(index, account)}
+                            onMouseEnter={() => setSelectedAccountIndex(accountIndex)}
+                            className={`w-full text-left px-3 py-3 border-b border-gray-100 dark:border-gray-700 transition-colors ${
+                              selectedAccountIndex === accountIndex 
+                                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
+                                : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                            }`}
+                          >
+                            <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                              {account.code} - {account.name}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded">
+                                {account.account_type_display}
+                              </span>
+                              {account.parent_name && (
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  Parent: {account.parent_code} - {account.parent_name}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                        {filteredAccounts.length === 0 && (
+                          <div className="px-3 py-2 text-gray-500 dark:text-gray-400 text-sm">
+                            No accounts found
+                          </div>
+                        )}
+                        {filteredAccounts.length > 0 && (
+                          <div className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                            Use ↑↓ arrows to navigate, Enter to select, Esc to close
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
 
@@ -490,7 +650,7 @@ const VoucherEntryPage = () => {
             ) : (
               <>
                 <Save className="h-4 w-4" />
-                Save Voucher
+                {isEditMode ? 'Update Voucher' : 'Save Voucher'}
               </>
             )}
           </Button>

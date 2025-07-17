@@ -122,7 +122,6 @@ class VoucherSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.name', read_only=True)
     financial_year_name = serializers.CharField(source='financial_year.name', read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
-    approved_by_name = serializers.CharField(source='approved_by.get_full_name', read_only=True)
     voucher_type_display = serializers.CharField(source='get_voucher_type_display', read_only=True)
     total_debit = serializers.ReadOnlyField()
     total_credit = serializers.ReadOnlyField()
@@ -133,14 +132,11 @@ class VoucherSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'company', 'company_name', 'financial_year', 'financial_year_name',
             'voucher_type', 'voucher_type_display', 'voucher_number', 'voucher_date',
-            'narration', 'reference', 'is_posted', 'is_approved', 'total_debit',
-            'total_credit', 'is_balanced', 'created_by', 'created_by_name',
-            'approved_by', 'approved_by_name', 'created_at', 'updated_at',
-            'line_entries'
+            'narration', 'reference', 'total_debit', 'total_credit', 'is_balanced', 
+            'created_by', 'created_by_name', 'created_at', 'updated_at', 'line_entries'
         ]
         read_only_fields = [
-            'id', 'voucher_number', 'created_by', 'approved_by', 
-            'created_at', 'updated_at'
+            'id', 'voucher_number', 'created_by', 'created_at', 'updated_at'
         ]
     
     def validate(self, attrs):
@@ -280,8 +276,8 @@ class VoucherListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'voucher_number', 'voucher_type', 'voucher_type_display',
             'voucher_date', 'narration', 'total_debit', 'total_credit',
-            'is_balanced', 'is_posted', 'is_approved', 'company_name',
-            'financial_year_name', 'line_entries_count', 'created_at'
+            'is_balanced', 'company_name', 'financial_year_name', 
+            'line_entries_count', 'created_at'
         ]
     
     def get_line_entries_count(self, obj):

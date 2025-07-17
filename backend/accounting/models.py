@@ -256,13 +256,8 @@ class Voucher(models.Model):
     narration = models.TextField(help_text='Description of the transaction')
     reference = models.CharField(max_length=255, blank=True, null=True, help_text='External reference number')
     
-    # Status and control
-    is_posted = models.BooleanField(default=False, help_text='Whether voucher is posted to accounts')
-    is_approved = models.BooleanField(default=False, help_text='Whether voucher is approved')
-    
     # System fields
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_vouchers')
-    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_vouchers')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -352,32 +347,13 @@ class Voucher(models.Model):
         """Check if voucher is balanced (total debit = total credit)"""
         return self.total_debit == self.total_credit
     
-    def post_voucher(self, user):
-        """Post voucher to accounts"""
-        if not self.is_balanced:
-            raise ValidationError('Cannot post unbalanced voucher')
-        
-        if self.is_posted:
-            raise ValidationError('Voucher is already posted')
-        
-        # TODO: Create actual ledger entries when ledger models are created
-        self.is_posted = True
-        self.approved_by = user
-        self.is_approved = True
-        self.save()
     
     def can_be_edited(self):
         """Check if voucher can be edited"""
-        if self.is_posted:
-            return False, "Cannot edit posted voucher"
-        if self.is_approved:
-            return False, "Cannot edit approved voucher"
         return True, "Voucher can be edited"
     
     def can_be_deleted(self):
         """Check if voucher can be deleted"""
-        if self.is_posted:
-            return False, "Cannot delete posted voucher"
         return True, "Voucher can be deleted"
 
 

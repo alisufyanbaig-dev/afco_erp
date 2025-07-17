@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Filter, Eye, Edit, Trash2, CheckCircle, Clock, Banknote, Landmark, FileText } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Edit, Trash2, Banknote, Landmark, FileText } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,38 +70,12 @@ const VouchersPage = () => {
 
 
   const handleDeleteVoucher = async (voucher) => {
-    if (voucher.is_posted) {
-      toast.error('Cannot delete posted voucher');
-      return;
-    }
-
     if (window.confirm(`Are you sure you want to delete voucher "${voucher.voucher_number}"?`)) {
       try {
         await voucherService.delete(voucher.id);
         loadVouchers();
       } catch (error) {
         console.error('Error deleting voucher:', error);
-      }
-    }
-  };
-
-  const handlePostVoucher = async (voucher) => {
-    if (voucher.is_posted) {
-      toast.error('Voucher is already posted');
-      return;
-    }
-
-    if (!voucher.is_balanced) {
-      toast.error('Cannot post unbalanced voucher');
-      return;
-    }
-
-    if (window.confirm(`Are you sure you want to post voucher "${voucher.voucher_number}"?`)) {
-      try {
-        await voucherService.post(voucher.id);
-        loadVouchers();
-      } catch (error) {
-        console.error('Error posting voucher:', error);
       }
     }
   };
@@ -197,39 +171,24 @@ const VouchersPage = () => {
               <Eye className="h-4 w-4" />
             </Link>
           </Button>
-          {!row.original.is_posted && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                asChild
-                className="h-8 w-8 p-0"
-              >
-                <Link to={`/vouchers/${row.original.id}/edit`}>
-                  <Edit className="h-4 w-4" />
-                </Link>
-              </Button>
-              {row.original.is_balanced && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handlePostVoucher(row.original)}
-                  className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
-                  title="Post Voucher"
-                >
-                  <CheckCircle className="h-4 w-4" />
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleDeleteVoucher(row.original)}
-                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            asChild
+            className="h-8 w-8 p-0"
+          >
+            <Link to={`/vouchers/${row.original.id}/edit`}>
+              <Edit className="h-4 w-4" />
+            </Link>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDeleteVoucher(row.original)}
+            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       )
     }

@@ -54,8 +54,8 @@ class VoucherLineEntryInline(admin.TabularInline):
 @admin.register(Voucher)
 class VoucherAdmin(admin.ModelAdmin):
     list_display = ['voucher_number', 'voucher_type', 'voucher_date', 'company', 'financial_year', 
-                    'total_amount_display', 'is_balanced_display', 'is_posted', 'is_approved']
-    list_filter = ['voucher_type', 'is_posted', 'is_approved', 'company', 'financial_year', 'voucher_date']
+                    'total_amount_display', 'is_balanced_display']
+    list_filter = ['voucher_type', 'company', 'financial_year', 'voucher_date']
     search_fields = ['voucher_number', 'narration', 'reference']
     readonly_fields = ['voucher_number', 'total_debit', 'total_credit', 'is_balanced', 
                        'created_at', 'updated_at']
@@ -72,11 +72,8 @@ class VoucherAdmin(admin.ModelAdmin):
             'fields': ('total_debit', 'total_credit', 'is_balanced'),
             'classes': ('collapse',)
         }),
-        ('Status', {
-            'fields': ('is_posted', 'is_approved')
-        }),
         ('System Information', {
-            'fields': ('created_by', 'approved_by', 'created_at', 'updated_at'),
+            'fields': ('created_by', 'created_at', 'updated_at'),
             'classes': ('collapse',)
         })
     )
@@ -96,7 +93,7 @@ class VoucherAdmin(admin.ModelAdmin):
     
     def get_queryset(self, request):
         return super().get_queryset(request).select_related(
-            'company', 'financial_year', 'created_by', 'approved_by'
+            'company', 'financial_year', 'created_by'
         ).prefetch_related('line_entries')
     
     def save_model(self, request, obj, form, change):

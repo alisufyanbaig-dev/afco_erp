@@ -192,7 +192,7 @@ class VoucherListCreateView(generics.ListCreateAPIView):
     Filters by current user's activated company and financial year.
     """
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['voucher_type', 'is_posted', 'is_approved', 'voucher_date']
+    filterset_fields = ['voucher_type', 'voucher_date']
     search_fields = ['voucher_number', 'narration', 'reference']
     ordering_fields = ['voucher_date', 'voucher_number', 'created_at']
     ordering = ['-voucher_date', '-voucher_number']
@@ -213,7 +213,7 @@ class VoucherListCreateView(generics.ListCreateAPIView):
                 company=user_activity.current_company,
                 financial_year=user_activity.current_financial_year
             ).select_related(
-                'company', 'financial_year', 'created_by', 'approved_by'
+                'company', 'financial_year', 'created_by'
             ).prefetch_related('line_entries__account')
         except UserActivity.DoesNotExist:
             return Voucher.objects.none()
@@ -263,7 +263,7 @@ class VoucherDetailView(generics.RetrieveUpdateDestroyAPIView):
                 company=user_activity.current_company,
                 financial_year=user_activity.current_financial_year
             ).select_related(
-                'company', 'financial_year', 'created_by', 'approved_by'
+                'company', 'financial_year', 'created_by'
             ).prefetch_related('line_entries__account')
         except UserActivity.DoesNotExist:
             return Voucher.objects.none()
@@ -315,50 +315,6 @@ class VoucherDetailView(generics.RetrieveUpdateDestroyAPIView):
             )
 
 
-@api_view(['POST'])
-def post_voucher(request, pk):
-    """
-    Post a voucher (mark as posted and approved).
-    """
-    try:
-        user = request.user
-        user_activity = UserActivity.objects.get(user=user)
-        
-        if not user_activity.current_company or not user_activity.current_financial_year:
-            return APIResponse.error(
-                message="No company or financial year activated.",
-                status_code=status.HTTP_400_BAD_REQUEST
-            )
-        
-        voucher = Voucher.objects.get(
-            pk=pk,
-            company=user_activity.current_company,
-            financial_year=user_activity.current_financial_year
-        )
-        
-        voucher.post_voucher(user)
-        
-        serializer = VoucherSerializer(voucher)
-        return APIResponse.success(
-            data=serializer.data,
-            message="Voucher posted successfully"
-        )
-    
-    except Voucher.DoesNotExist:
-        return APIResponse.error(
-            message="Voucher not found",
-            status_code=status.HTTP_404_NOT_FOUND
-        )
-    except UserActivity.DoesNotExist:
-        return APIResponse.error(
-            message="User activity not found",
-            status_code=status.HTTP_400_BAD_REQUEST
-        )
-    except Exception as e:
-        return APIResponse.error(
-            message=f"Error posting voucher: {str(e)}",
-            status_code=status.HTTP_400_BAD_REQUEST
-        )
 
 
 @api_view(['GET'])

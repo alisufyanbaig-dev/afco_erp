@@ -13,6 +13,5 @@ urlpatterns = [
     # Voucher URLs
     path('vouchers/', views.VoucherListCreateView.as_view(), name='voucher-list-create'),
     path('vouchers/<int:pk>/', views.VoucherDetailView.as_view(), name='voucher-detail'),
-    path('vouchers/<int:pk>/post/', views.post_voucher, name='post-voucher'),
     path('voucher-types/', views.voucher_types, name='voucher-types'),
 ]

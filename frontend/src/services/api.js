@@ -555,19 +555,6 @@ export const chartOfAccountsService = {
 export const voucherService = {
   ...createCRUDService('/accounting/vouchers'),
   
-  // Post voucher
-  post: async (id) => {
-    try {
-      const result = await apiClient.post(`/accounting/vouchers/${id}/post/`);
-      if (result.success) {
-        toast.success(result.message || 'Voucher posted successfully!');
-      }
-      return result;
-    } catch (error) {
-      throw error;
-    }
-  },
-  
   // Get voucher types
   getVoucherTypes: async () => {
     return apiClient.get('/accounting/voucher-types/');

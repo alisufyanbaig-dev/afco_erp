@@ -62,15 +62,7 @@ const AppRoutes = () => {
                     />
                   } 
                 />
-                <Route 
-                  path="/vouchers/:id/edit" 
-                  element={
-                    <ComingSoonPage 
-                      title="Edit Voucher"
-                      description="Edit voucher details and line entries"
-                    />
-                  } 
-                />
+                <Route path="/vouchers/:id/edit" element={<VoucherEntryPage />} />
                 <Route 
                   path="/accounting/reports" 
                   element={
