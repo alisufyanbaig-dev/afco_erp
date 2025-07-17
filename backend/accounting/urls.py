@@ -14,4 +14,7 @@ urlpatterns = [
     path('vouchers/', views.VoucherListCreateView.as_view(), name='voucher-list-create'),
     path('vouchers/<int:pk>/', views.VoucherDetailView.as_view(), name='voucher-detail'),
     path('voucher-types/', views.voucher_types, name='voucher-types'),
+    
+    # Reports URLs
+    path('trial-balance/', views.trial_balance, name='trial-balance'),
 ]

@@ -561,6 +561,18 @@ export const voucherService = {
   }
 };
 
+/**
+ * Trial Balance service
+ */
+export const trialBalanceService = {
+  // Get trial balance
+  get: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const url = queryString ? `/accounting/trial-balance/?${queryString}` : '/accounting/trial-balance/';
+    return apiClient.get(url);
+  }
+};
+
 // Export the error class for custom error handling
 export { APIError };
 

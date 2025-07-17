@@ -11,6 +11,7 @@ import FinancialYears from '../../pages/financial-years';
 import ChartOfAccountsPage from '../../pages/chart-of-accounts';
 import VouchersPage from '../../pages/vouchers';
 import VoucherEntryPage from '../../pages/voucher-entry';
+import TrialBalancePage from '../../pages/trial-balance';
 
 // Coming Soon component for unfinished pages
 const ComingSoonPage = ({ title, description }) => (
@@ -63,6 +64,7 @@ const AppRoutes = () => {
                   } 
                 />
                 <Route path="/vouchers/:id/edit" element={<VoucherEntryPage />} />
+                <Route path="/trial-balance" element={<TrialBalancePage />} />
                 <Route 
                   path="/accounting/reports" 
                   element={
