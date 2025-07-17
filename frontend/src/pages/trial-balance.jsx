@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Download, Calendar, RefreshCw, Calculator } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,18 +16,19 @@ const TrialBalancePage = () => {
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [filters, setFilters] = useState({
     from_date: userActivity.current_financial_year_start_date || new Date().toISOString().split('T')[0],
-    to_date: new Date().toISOString().split('T')[0]
+    to_date: userActivity.current_financial_year_end_date || new Date().toISOString().split('T')[0]
   });
 
   useEffect(() => {
     // Update default dates when financial year changes
-    if (userActivity.current_financial_year_start_date) {
+    if (userActivity.current_financial_year_start_date && userActivity.current_financial_year_end_date) {
       setFilters(prev => ({
         ...prev,
-        from_date: userActivity.current_financial_year_start_date
+        from_date: userActivity.current_financial_year_start_date,
+        to_date: userActivity.current_financial_year_end_date
       }));
     }
-  }, [userActivity.current_financial_year_start_date]);
+  }, [userActivity.current_financial_year_start_date, userActivity.current_financial_year_end_date]);
 
   useEffect(() => {
     if (userActivity.current_company && userActivity.current_financial_year) {
@@ -126,9 +128,18 @@ const TrialBalancePage = () => {
                   <span className={`font-mono text-sm ${account.is_group_account ? 'font-bold' : ''}`}>
                     {account.code}
                   </span>
-                  <span className={account.is_group_account ? 'font-semibold' : ''}>
-                    {account.name}
-                  </span>
+                  {account.is_group_account ? (
+                    <span className="font-semibold">
+                      {account.name}
+                    </span>
+                  ) : (
+                    <Link
+                      to={`/ledger-report?account_id=${account.id}&from_date=${filters.from_date}&to_date=${filters.to_date}`}
+                      className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
+                    >
+                      {account.name}
+                    </Link>
+                  )}
                   <Badge className={getAccountTypeColor(account.account_type)}>
                     {account.account_type_display}
                   </Badge>

@@ -556,3 +556,184 @@ def trial_balance(request):
             message=f"Error generating trial balance: {str(e)}",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+@api_view(['GET'])
+def ledger_report(request):
+    """
+    Generate ledger report for a specific account showing all transactions.
+    Query parameters:
+    - account_id: Account ID to generate ledger for (required)
+    - from_date: Start date for transactions (default: financial year start)
+    - to_date: End date for transactions (default: current date)
+    """
+    try:
+        from django.db.models import Sum, Q
+        from decimal import Decimal
+        from datetime import date
+        
+        user = request.user
+        user_activity = UserActivity.objects.get(user=user)
+        
+        if not user_activity.current_company:
+            return APIResponse.error(
+                message="No company activated. Please activate a company first.",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not user_activity.current_financial_year:
+            return APIResponse.error(
+                message="No financial year activated. Please activate a financial year first.",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        
+        company = user_activity.current_company
+        financial_year = user_activity.current_financial_year
+        
+        # Parse query parameters
+        account_id = request.GET.get('account_id')
+        from_date = request.GET.get('from_date')
+        to_date = request.GET.get('to_date')
+        
+        # Validate account_id
+        if not account_id:
+            return APIResponse.error(
+                message="Account ID is required",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            account = ChartOfAccounts.objects.get(
+                id=account_id,
+                company=company,
+                is_active=True
+            )
+        except ChartOfAccounts.DoesNotExist:
+            return APIResponse.error(
+                message="Account not found or not accessible",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Set default dates
+        if from_date:
+            from_date = date.fromisoformat(from_date)
+        else:
+            from_date = financial_year.start_date
+        
+        if to_date:
+            to_date = date.fromisoformat(to_date)
+        else:
+            to_date = date.today()
+        
+        # Validate date range
+        if from_date > to_date:
+            return APIResponse.error(
+                message="From date cannot be later than to date",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Calculate opening balance (transactions before from_date)
+        opening_entries = VoucherLineEntry.objects.filter(
+            account=account,
+            voucher__company=company,
+            voucher__financial_year=financial_year,
+            voucher__voucher_date__lt=from_date
+        ).aggregate(
+            total_debit=Sum('debit_amount', default=Decimal('0')),
+            total_credit=Sum('credit_amount', default=Decimal('0'))
+        )
+        
+        opening_debit = opening_entries['total_debit'] or Decimal('0')
+        opening_credit = opening_entries['total_credit'] or Decimal('0')
+        opening_balance = opening_debit - opening_credit
+        
+        # Get all transactions for the specified period
+        transactions = VoucherLineEntry.objects.filter(
+            account=account,
+            voucher__company=company,
+            voucher__financial_year=financial_year,
+            voucher__voucher_date__gte=from_date,
+            voucher__voucher_date__lte=to_date
+        ).select_related('voucher').order_by('voucher__voucher_date', 'voucher__voucher_number', 'id')
+        
+        # Build transaction list with running balance
+        transaction_list = []
+        running_balance = opening_balance
+        
+        for entry in transactions:
+            # Calculate transaction amount and new balance
+            if entry.debit_amount > 0:
+                running_balance += entry.debit_amount
+            else:
+                running_balance -= entry.credit_amount
+            
+            transaction_list.append({
+                'id': entry.id,
+                'voucher_id': entry.voucher.id,
+                'date': entry.voucher.voucher_date.isoformat(),
+                'voucher_number': entry.voucher.voucher_number,
+                'voucher_type': entry.voucher.voucher_type,
+                'voucher_type_display': entry.voucher.get_voucher_type_display(),
+                'description': entry.description or entry.voucher.narration,
+                'debit_amount': float(entry.debit_amount),
+                'credit_amount': float(entry.credit_amount),
+                'running_balance': float(running_balance)
+            })
+        
+        # Calculate period totals
+        period_totals = transactions.aggregate(
+            total_debit=Sum('debit_amount', default=Decimal('0')),
+            total_credit=Sum('credit_amount', default=Decimal('0'))
+        )
+        
+        period_debit = period_totals['total_debit'] or Decimal('0')
+        period_credit = period_totals['total_credit'] or Decimal('0')
+        closing_balance = opening_balance + period_debit - period_credit
+        
+        response_data = {
+            'account': {
+                'id': account.id,
+                'code': account.code,
+                'name': account.name,
+                'account_type': account.account_type,
+                'account_type_display': account.get_account_type_display(),
+                'is_group_account': account.is_group_account
+            },
+            'opening_balance': float(opening_balance),
+            'closing_balance': float(closing_balance),
+            'period_totals': {
+                'debit': float(period_debit),
+                'credit': float(period_credit),
+                'net_change': float(period_debit - period_credit)
+            },
+            'transactions': transaction_list,
+            'meta': {
+                'company_name': company.name,
+                'financial_year': financial_year.name,
+                'from_date': from_date.isoformat(),
+                'to_date': to_date.isoformat(),
+                'transaction_count': len(transaction_list),
+                'generated_at': date.today().isoformat()
+            }
+        }
+        
+        return APIResponse.success(
+            data=response_data,
+            message="Ledger report generated successfully"
+        )
+    
+    except UserActivity.DoesNotExist:
+        return APIResponse.error(
+            message="User activity not found. Please activate a company and financial year first.",
+            status_code=status.HTTP_400_BAD_REQUEST
+        )
+    except ValueError as e:
+        return APIResponse.error(
+            message=f"Invalid date format: {str(e)}",
+            status_code=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return APIResponse.error(
+            message=f"Error generating ledger report: {str(e)}",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

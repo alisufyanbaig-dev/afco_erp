@@ -59,6 +59,7 @@ const navigationItems = [
     children: [
       { title: "Chart of Accounts", icon: BookOpen, href: "/chart-of-accounts" },
       { title: "Vouchers", icon: Receipt, href: "/vouchers" },
+      { title: "Ledger Report", icon: BookOpen, href: "/ledger-report" },
       { title: "Trial Balance", icon: Calculator, href: "/trial-balance" },
       { title: "Financial Reports", icon: PieChart, href: "/accounting/reports" },
     ],

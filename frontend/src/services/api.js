@@ -573,6 +573,18 @@ export const trialBalanceService = {
   }
 };
 
+/**
+ * Ledger Report service
+ */
+export const ledgerReportService = {
+  // Get ledger report
+  get: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const url = queryString ? `/accounting/ledger-report/?${queryString}` : '/accounting/ledger-report/';
+    return apiClient.get(url);
+  }
+};
+
 // Export the error class for custom error handling
 export { APIError };
 
