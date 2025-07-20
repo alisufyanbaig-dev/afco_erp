@@ -13,8 +13,12 @@ AFCO ERP is a Django REST Framework + React Enterprise Resource Planning applica
 # Navigate to backend directory
 cd /home/ali/development/afco_erp/backend
 
-# Run development server manually (alternative to systemd service)
-python manage.py runserver 3500
+# Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install backend dependencies
+pip install -r requirements.txt
 
 # Database operations
 python manage.py makemigrations
@@ -27,8 +31,15 @@ from common.models import User
 User.objects.create_user(email='test@example.com', password='testpass123', first_name='Test', last_name='User')
 "
 
-# Install backend dependencies
-pip install -r requirements.txt
+# Run development server manually (alternative to systemd service)
+python manage.py runserver 3500
+
+# Run tests
+python manage.py test
+
+# Run specific app tests
+python manage.py test common
+python manage.py test accounting
 ```
 
 ### Frontend (React + Vite)
@@ -36,17 +47,24 @@ pip install -r requirements.txt
 # Navigate to frontend directory  
 cd /home/ali/development/afco_erp/frontend
 
+# Install frontend dependencies (using pnpm preferred)
+pnpm install
+# OR using npm
+npm install
+
 # Development server (alternative to systemd service)
 npm run dev -- --host 0.0.0.0 --port 3501
+# OR with pnpm
+pnpm dev -- --host 0.0.0.0 --port 3501
 
 # Build for production
 npm run build
 
+# Preview production build
+npm run preview
+
 # Lint code
 npm run lint
-
-# Install frontend dependencies
-npm install
 ```
 
 ### Service Management
@@ -75,6 +93,9 @@ sudo journalctl -u afco-frontend.service -f
 - `common/views.py` - Authentication APIs using standardized response format
 - `common/utils.py` - `APIResponse` class for consistent API responses
 - `common/serializers.py` - DRF serializers with custom JWT token handling
+- `accounting/models.py` - ChartOfAccounts, Voucher, VoucherLineEntry with double-entry validation
+- `accounting/views.py` - Accounting APIs for chart of accounts, vouchers, and reports
+- `accounting/urls.py` - Accounting module URL patterns
 
 **API Architecture:**
 - **Base URL:** `http://localhost:3500/api/`
@@ -88,6 +109,11 @@ sudo journalctl -u afco-frontend.service -f
 - `POST /api/auth/logout/` - Token blacklisting
 - `GET/PUT /api/auth/profile/` - Profile management
 - `POST /api/auth/change-password/` - Password change
+- `GET/POST /api/accounting/chart-of-accounts/` - Chart of accounts management
+- `GET /api/accounting/chart-of-accounts/hierarchy/` - Hierarchical account structure
+- `GET/POST /api/accounting/vouchers/` - Voucher entry system
+- `GET /api/accounting/ledger-report/` - Ledger reports
+- `GET /api/accounting/trial-balance/` - Trial balance reports
 
 ### Frontend Structure (`/frontend/src/`)
 
@@ -149,6 +175,16 @@ The application supports dark/light themes with:
 - **Tailwind dark: classes** throughout components
 - **Icon theming** with appropriate contrast colors
 
+### Double-Entry Accounting System
+
+The application implements a complete double-entry bookkeeping system:
+- **Chart of Accounts**: Hierarchical account structure with auto-generated codes (1, 1-1, 1-1-1)
+- **Account Types**: Asset, Liability, Income, Expense with validation
+- **Voucher System**: Cash, Bank, and Journal vouchers with line entries
+- **Balance Validation**: Automatic debit/credit balance checking (total debit = total credit)
+- **Group Account Restrictions**: Group accounts cannot have direct entries
+- **Voucher Numbers**: Auto-generated format (CV-2024-0001, BV-2024-0001, JV-2024-0001)
+
 ### Pakistani Business Features
 
 The application includes Pakistan-specific validations and fields:
@@ -158,14 +194,23 @@ The application includes Pakistan-specific validations and fields:
 - **STRN field** for Sales Tax Registration Number
 - **PKT timezone** (Asia/Karachi) configuration
 
+### Multi-Company Architecture
+
+The application supports multiple companies with data isolation:
+- **Company Isolation**: All business data (accounts, vouchers) is segregated by company
+- **User Activity**: Users can switch between companies and financial years via `UserActivityContext`
+- **Financial Year Management**: Each company has independent financial periods
+- **Access Control**: Users can access multiple companies but work in one active company/year at a time
+
 ## Development Patterns
 
 ### Adding New API Endpoints
 
-1. Create view in `backend/common/views.py` using `APIResponse` utility
-2. Add URL pattern to `backend/common/urls.py`
-3. Create service function in `frontend/src/services/api.js` or use `createCRUDService`
-4. Handle responses in frontend components (errors automatically toast)
+1. Create view in appropriate app's `views.py` (e.g., `backend/accounting/views.py`) using `APIResponse` utility
+2. Add URL pattern to app's `urls.py` (e.g., `backend/accounting/urls.py`)
+3. Include app URLs in main `backend/afco_erp/urls.py` if needed
+4. Create service function in `frontend/src/services/api.js` or use `createCRUDService`
+5. Handle responses in frontend components (errors automatically toast)
 
 ### Creating New UI Components
 
@@ -201,4 +246,42 @@ Both services are configured to:
 - **Run as user** `ali` with appropriate permissions
 - **Log to systemd journal** for debugging
 
-You need to improve the prompt that I send you, add more details to it that I miss add proper functionality to it.
+## Initial Setup
+
+To set up the development environment from scratch:
+
+### Backend Setup
+```bash
+cd /home/ali/development/afco_erp/backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py createsuperuser
+```
+
+### Frontend Setup
+```bash
+cd /home/ali/development/afco_erp/frontend
+pnpm install  # or npm install
+```
+
+### Database Connection
+The application uses SQLite3 by default (configured in `settings.py`). For production, update `DATABASES` setting to use PostgreSQL or MySQL.
+
+### Service Setup
+Both backend and frontend are configured to run as systemd services:
+```bash
+# Services are managed by systemd
+sudo systemctl enable afco-backend.service
+sudo systemctl enable afco-frontend.service
+sudo systemctl start afco-backend.service
+sudo systemctl start afco-frontend.service
+```
+most important::
+""Make sure your code is DRY and modular, and YAGNI principles with simple code no complexity at all no longer file writing split big files 
+on base of their nature to different files into a grouper folder""
+
+> servers are already running using systemctl just restart when you make changes
+
+When you create a component make sure it is not already exisiting and if you need to make and you do have to make then use builtin components using shadecn and radixui latest versions

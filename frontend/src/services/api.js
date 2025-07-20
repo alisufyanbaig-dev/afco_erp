@@ -585,6 +585,63 @@ export const ledgerReportService = {
   }
 };
 
+/**
+ * HS Code service
+ */
+export const hsCodeService = createCRUDService('/inventory/hs-codes');
+
+/**
+ * Category service
+ */
+export const categoryService = createCRUDService('/inventory/categories');
+
+/**
+ * Product service
+ */
+export const productService = {
+  ...createCRUDService('/inventory/products'),
+  
+  // Get products list for dropdowns
+  getList: async () => {
+    return apiClient.get('/inventory/products/list/');
+  },
+  
+  // Get low stock products
+  getLowStock: async () => {
+    return apiClient.get('/inventory/products/low-stock/');
+  },
+  
+  // Get unit choices
+  getUnitChoices: async () => {
+    return apiClient.get('/inventory/unit-choices/');
+  }
+};
+
+/**
+ * Stock Invoice service
+ */
+export const stockInvoiceService = {
+  ...createCRUDService('/inventory/stock-invoices'),
+  
+  // Confirm stock invoice
+  confirm: async (id) => {
+    try {
+      const result = await apiClient.post(`/inventory/stock-invoices/${id}/confirm/`);
+      if (result.success) {
+        toast.success(result.message || 'Stock invoice confirmed successfully!');
+      }
+      return result;
+    } catch (error) {
+      throw error;
+    }
+  },
+  
+  // Get invoice types
+  getInvoiceTypes: async () => {
+    return apiClient.get('/inventory/invoice-types/');
+  }
+};
+
 // Export the error class for custom error handling
 export { APIError };
 

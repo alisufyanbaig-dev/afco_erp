@@ -68,11 +68,10 @@ const navigationItems = [
     title: "Inventory",
     icon: Package,
     children: [
+      { title: "HS Codes", icon: Tag, href: "/inventory/hs-codes" },
+      { title: "Categories", icon: Archive, href: "/inventory/categories" },
       { title: "Products", icon: Package, href: "/inventory/products" },
-      { title: "Categories", icon: Tag, href: "/inventory/categories" },
-      { title: "Suppliers", icon: Truck, href: "/inventory/suppliers" },
-      { title: "Warehouse", icon: Warehouse, href: "/inventory/warehouse" },
-      { title: "Stock Movements", icon: Archive, href: "/inventory/stock-movements" },
+      { title: "Stock Invoices", icon: Receipt, href: "/inventory/stock-invoices" },
     ],
   },
   {

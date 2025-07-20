@@ -15,6 +15,13 @@ import LedgerReportPage from '../../pages/ledger-report';
 import TrialBalancePage from '../../pages/trial-balance';
 import VoucherViewPage from '../../pages/voucher-view';
 
+// Inventory page imports
+import HSCodesPage from '../../pages/inventory/hs-codes';
+import CategoriesPage from '../../pages/inventory/categories';
+import ProductsPage from '../../pages/inventory/products';
+import StockInvoicesPage from '../../pages/inventory/stock-invoices';
+import StockInvoiceEntryPage from '../../pages/inventory/stock-invoice-entry';
+
 // Coming Soon component for unfinished pages
 const ComingSoonPage = ({ title, description }) => (
   <div className="space-y-6">
@@ -71,51 +78,12 @@ const AppRoutes = () => {
                 />
                 
                 {/* Inventory routes */}
-                <Route 
-                  path="/inventory/products" 
-                  element={
-                    <ComingSoonPage 
-                      title="Products"
-                      description="Manage your product catalog"
-                    />
-                  } 
-                />
-                <Route 
-                  path="/inventory/categories" 
-                  element={
-                    <ComingSoonPage 
-                      title="Categories"
-                      description="Organize products into categories"
-                    />
-                  } 
-                />
-                <Route 
-                  path="/inventory/suppliers" 
-                  element={
-                    <ComingSoonPage 
-                      title="Suppliers"
-                      description="Manage supplier relationships"
-                    />
-                  } 
-                />
-                <Route 
-                  path="/inventory/warehouse" 
-                  element={
-                    <ComingSoonPage 
-                      title="Warehouse"
-                      description="Warehouse management and tracking"
-                    />
-                  } 
-                />
-                <Route 
-                  path="/inventory/stock-movements" 
-                  element={
-                    <ComingSoonPage 
-                      title="Stock Movements"
-                      description="Track inventory movements and transfers"
-                    />
-                  } 
-                />
+                <Route path="/inventory/hs-codes" element={<HSCodesPage />} />
+                <Route path="/inventory/categories" element={<CategoriesPage />} />
+                <Route path="/inventory/products" element={<ProductsPage />} />
+                <Route path="/inventory/stock-invoices" element={<StockInvoicesPage />} />
+                <Route path="/stock-invoice-entry" element={<StockInvoiceEntryPage />} />
+                <Route path="/stock-invoice-entry/:id" element={<StockInvoiceEntryPage />} />
                 
                 {/* Business operations routes */}
                 <Route 
