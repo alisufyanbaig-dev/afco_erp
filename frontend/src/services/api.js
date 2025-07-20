@@ -618,6 +618,29 @@ export const productService = {
 };
 
 /**
+ * Party service
+ */
+export const partyService = {
+  ...createCRUDService('/inventory/parties'),
+  
+  // Get parties list for dropdowns
+  getList: async () => {
+    return apiClient.get('/inventory/parties/list/');
+  },
+  
+  // Search parties for searchable select
+  search: async (searchTerm = '') => {
+    const params = new URLSearchParams();
+    if (searchTerm) {
+      params.append('search', searchTerm);
+    }
+    const queryString = params.toString();
+    const url = queryString ? `/inventory/parties/list/?${queryString}` : '/inventory/parties/list/';
+    return apiClient.get(url);
+  }
+};
+
+/**
  * Stock Invoice service
  */
 export const stockInvoiceService = {

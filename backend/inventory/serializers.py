@@ -165,9 +165,9 @@ class StockInvoiceLineItemSerializer(serializers.ModelSerializer):
         model = StockInvoiceLineItem
         fields = [
             'id', 'product', 'product_code', 'product_name', 'product_unit',
-            'serial_number', 'quantity', 'unit_price', 'amount_ex_gst', 'gst_rate', 
+            'quantity', 'unit_price', 'amount_ex_gst', 'gst_rate', 
             'gst_value', 'amount_inc_gst', 'total_value', 'gst_amount',
-            'total_with_gst', 'description', 'line_number', 'created_at', 'updated_at'
+            'total_with_gst', 'line_number', 'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'line_number', 'amount_ex_gst', 'amount_inc_gst', 'total_value', 
@@ -214,7 +214,7 @@ class StockInvoiceSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'company', 'company_name', 'financial_year', 'financial_year_name',
             'invoice_type', 'invoice_type_display', 'invoice_number', 'invoice_date',
-            'party', 'party_name', 'party_address', 'party_contact', 'reference_number',
+            'party', 'party_name', 'reference_number',
             'subtotal', 'total_gst', 'total_amount', 'notes',
             'created_by', 'created_by_name', 'created_at', 'updated_at', 'line_items'
         ]
@@ -273,12 +273,6 @@ class StockInvoiceSerializer(serializers.ModelSerializer):
         return stock_invoice
     
     def update(self, instance, validated_data):
-        # Only allow editing if status is draft
-        if instance.status != 'draft':
-            raise serializers.ValidationError(
-                'Only draft invoices can be edited.'
-            )
-        
         line_items_data = validated_data.pop('line_items', None)
         
         # Update invoice fields
@@ -305,14 +299,14 @@ class StockInvoiceListSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.name', read_only=True)
     financial_year_name = serializers.CharField(source='financial_year.name', read_only=True)
     invoice_type_display = serializers.CharField(source='get_invoice_type_display', read_only=True)
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    party_name = serializers.CharField(source='party.name', read_only=True)
     line_items_count = serializers.SerializerMethodField()
     
     class Meta:
         model = StockInvoice
         fields = [
             'id', 'invoice_number', 'invoice_type', 'invoice_type_display',
-            'invoice_date', 'party_name', 'total_amount', 'status', 'status_display',
+            'invoice_date', 'party_name', 'total_amount',
             'company_name', 'financial_year_name', 'line_items_count', 'created_at'
         ]
     

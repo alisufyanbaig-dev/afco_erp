@@ -19,8 +19,15 @@ import VoucherViewPage from '../../pages/voucher-view';
 import HSCodesPage from '../../pages/inventory/hs-codes';
 import CategoriesPage from '../../pages/inventory/categories';
 import ProductsPage from '../../pages/inventory/products';
+import PartiesPage from '../../pages/inventory/parties';
+import PartyCreatePage from '../../pages/inventory/party-create';
+import PartyEditPage from '../../pages/inventory/party-edit';
+import PartyViewPage from '../../pages/inventory/party-view';
 import StockInvoicesPage from '../../pages/inventory/stock-invoices';
 import StockInvoiceEntryPage from '../../pages/inventory/stock-invoice-entry';
+import StockInvoiceViewPage from '../../pages/inventory/stock-invoice-view';
+import StockMovementReportPage from '../../pages/inventory/stock-movement-report';
+import StockValuationReportPage from '../../pages/inventory/stock-valuation-report';
 
 // Coming Soon component for unfinished pages
 const ComingSoonPage = ({ title, description }) => (
@@ -78,12 +85,19 @@ const AppRoutes = () => {
                 />
                 
                 {/* Inventory routes */}
+                <Route path="/inventory/parties" element={<PartiesPage />} />
+                <Route path="/inventory/parties/create" element={<PartyCreatePage />} />
+                <Route path="/inventory/parties/:id/edit" element={<PartyEditPage />} />
+                <Route path="/inventory/parties/:id" element={<PartyViewPage />} />
                 <Route path="/inventory/hs-codes" element={<HSCodesPage />} />
                 <Route path="/inventory/categories" element={<CategoriesPage />} />
                 <Route path="/inventory/products" element={<ProductsPage />} />
                 <Route path="/inventory/stock-invoices" element={<StockInvoicesPage />} />
-                <Route path="/stock-invoice-entry" element={<StockInvoiceEntryPage />} />
-                <Route path="/stock-invoice-entry/:id" element={<StockInvoiceEntryPage />} />
+                <Route path="/inventory/stock-invoices/create" element={<StockInvoiceEntryPage />} />
+                <Route path="/inventory/stock-invoices/:id/edit" element={<StockInvoiceEntryPage />} />
+                <Route path="/inventory/stock-invoices/:id" element={<StockInvoiceViewPage />} />
+                <Route path="/inventory/reports/stock-movement" element={<StockMovementReportPage />} />
+                <Route path="/inventory/reports/stock-valuation" element={<StockValuationReportPage />} />
                 
                 {/* Business operations routes */}
                 <Route 

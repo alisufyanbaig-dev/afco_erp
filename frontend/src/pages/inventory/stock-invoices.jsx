@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Eye, Edit, Trash2, CheckCircle, FileText } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Edit, FileText } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,6 @@ const StockInvoicesPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('');
   const [pagination, setPagination] = useState({
     page: 1,
     pageSize: 20,
@@ -31,7 +30,7 @@ const StockInvoicesPage = () => {
   // Load stock invoices when filters change
   useEffect(() => {
     loadStockInvoices();
-  }, [pagination.page, searchTerm, selectedType, selectedStatus]);
+  }, [pagination.page, searchTerm, selectedType]);
 
   const loadInvoiceTypes = async () => {
     try {
@@ -51,8 +50,7 @@ const StockInvoicesPage = () => {
         page: pagination.page,
         page_size: pagination.pageSize,
         search: searchTerm,
-        ...(selectedType && { invoice_type: selectedType }),
-        ...(selectedStatus && { status: selectedStatus })
+        ...(selectedType && { invoice_type: selectedType })
       };
 
       const response = await stockInvoiceService.list(params);
@@ -77,67 +75,19 @@ const StockInvoicesPage = () => {
       return;
     }
     // Navigate to create invoice page
-    window.location.href = '/stock-invoice-entry';
+    window.location.href = '/inventory/stock-invoices/create';
   };
 
   const handleViewInvoice = (invoice) => {
     // Navigate to view invoice page
-    window.location.href = `/stock-invoice-view/${invoice.id}`;
+    window.location.href = `/inventory/stock-invoices/${invoice.id}`;
   };
 
   const handleEditInvoice = (invoice) => {
-    if (invoice.status !== 'draft') {
-      toast.error('Only draft invoices can be edited');
-      return;
-    }
-    // Navigate to edit invoice page
-    window.location.href = `/stock-invoice-entry/${invoice.id}`;
+    // Navigate to edit invoice page - all invoices can be edited
+    window.location.href = `/inventory/stock-invoices/${invoice.id}/edit`;
   };
 
-  const handleConfirmInvoice = async (invoice) => {
-    if (invoice.status !== 'draft') {
-      toast.error('Only draft invoices can be confirmed');
-      return;
-    }
-    
-    if (window.confirm(`Are you sure you want to confirm invoice "${invoice.invoice_number}"? This will update stock levels.`)) {
-      try {
-        await stockInvoiceService.confirm(invoice.id);
-        loadStockInvoices();
-      } catch (error) {
-        console.error('Error confirming invoice:', error);
-      }
-    }
-  };
-
-  const handleDeleteInvoice = async (invoice) => {
-    if (invoice.status !== 'draft') {
-      toast.error('Only draft invoices can be deleted');
-      return;
-    }
-    
-    if (window.confirm(`Are you sure you want to delete invoice "${invoice.invoice_number}"?`)) {
-      try {
-        await stockInvoiceService.delete(invoice.id);
-        loadStockInvoices();
-      } catch (error) {
-        console.error('Error deleting invoice:', error);
-      }
-    }
-  };
-
-  const getStatusBadgeVariant = (status) => {
-    switch (status) {
-      case 'confirmed':
-        return 'default';
-      case 'draft':
-        return 'secondary';
-      case 'cancelled':
-        return 'destructive';
-      default:
-        return 'secondary';
-    }
-  };
 
   const getTypeBadgeVariant = (type) => {
     switch (type) {
@@ -207,16 +157,6 @@ const StockInvoicesPage = () => {
       ),
     },
     {
-      id: 'status',
-      header: 'Status',
-      accessorKey: 'status_display',
-      cell: ({ row }) => (
-        <Badge variant={getStatusBadgeVariant(row.original.status)}>
-          {row.original.status_display}
-        </Badge>
-      ),
-    },
-    {
       id: 'line_items_count',
       header: 'Items',
       accessorKey: 'line_items_count',
@@ -240,37 +180,15 @@ const StockInvoicesPage = () => {
           >
             <Eye className="h-4 w-4" />
           </Button>
-          {row.original.status === 'draft' && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleEditInvoice(row.original)}
-                className="h-8 w-8 p-0"
-                title="Edit"
-              >
-                <Edit className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleConfirmInvoice(row.original)}
-                className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
-                title="Confirm"
-              >
-                <CheckCircle className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleDeleteInvoice(row.original)}
-                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                title="Delete"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleEditInvoice(row.original)}
+            className="h-8 w-8 p-0"
+            title="Edit"
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
         </div>
       ),
     },
@@ -334,18 +252,6 @@ const StockInvoicesPage = () => {
                   {type.label}
                 </option>
               ))}
-            </select>
-          </div>
-          <div className="w-full sm:w-48">
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-            >
-              <option value="">All Status</option>
-              <option value="draft">Draft</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="cancelled">Cancelled</option>
             </select>
           </div>
         </div>

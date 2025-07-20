@@ -238,9 +238,7 @@ class StockInvoice(models.Model):
     invoice_date = models.DateField()
     
     # Party details (supplier/customer)
-    party = models.ForeignKey(Party, on_delete=models.PROTECT, related_name='stock_invoices')
-    party_address = models.TextField(blank=True, null=True)
-    party_contact = models.CharField(max_length=100, blank=True, null=True)
+    party = models.ForeignKey(Party, on_delete=models.PROTECT, related_name='stock_invoices', null=True, blank=True)
     
     # Reference information
     reference_number = models.CharField(max_length=100, blank=True, null=True, help_text='External reference/PO number')
@@ -378,11 +376,9 @@ class StockInvoiceLineItem(models.Model):
     gst_amount = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0'))
     
     # Line details
-    serial_number = models.CharField(max_length=100, blank=True, null=True, help_text='Item serial number')
     amount_ex_gst = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0'), help_text='Amount excluding GST')
     gst_value = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0'), help_text='GST amount value')
     amount_inc_gst = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0'), help_text='Amount including GST')
-    description = models.TextField(blank=True, null=True, help_text='Description for this line item')
     line_number = models.PositiveIntegerField(help_text='Line sequence number')
     
     # System fields
@@ -446,8 +442,330 @@ class StockInvoiceLineItem(models.Model):
         # Update parent invoice totals
         self.stock_invoice.calculate_totals()
         self.stock_invoice.save(update_fields=['subtotal', 'total_gst', 'total_amount'])
+        
+        # Create stock movement record
+        StockMovement.create_from_line_item(self)
     
     @property
     def total_with_gst(self):
         """Return total value including GST"""
         return self.amount_inc_gst
+
+
+class StockMovement(models.Model):
+    """Track all stock movements with cost allocation for reporting"""
+    MOVEMENT_TYPES = [
+        ('purchase', 'Purchase'),
+        ('sale', 'Sale'),
+        ('export', 'Export'),
+        ('import', 'Import'),
+        ('sale_return', 'Sale Return'),
+        ('purchase_return', 'Purchase Return'),
+        ('adjustment', 'Stock Adjustment'),
+        ('opening', 'Opening Stock'),
+    ]
+    
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='stock_movements')
+    financial_year = models.ForeignKey(FinancialYear, on_delete=models.CASCADE, related_name='stock_movements')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='stock_movements_detailed')
+    
+    # Movement details
+    movement_type = models.CharField(max_length=20, choices=MOVEMENT_TYPES)
+    movement_date = models.DateField()
+    reference_number = models.CharField(max_length=100, help_text='Invoice/Document number')
+    
+    # Quantity details
+    quantity_in = models.DecimalField(max_digits=15, decimal_places=3, default=Decimal('0'), help_text='Quantity received')
+    quantity_out = models.DecimalField(max_digits=15, decimal_places=3, default=Decimal('0'), help_text='Quantity issued')
+    balance_quantity = models.DecimalField(max_digits=15, decimal_places=3, default=Decimal('0'), help_text='Running balance')
+    
+    # Cost allocation (average cost method)
+    unit_cost = models.DecimalField(max_digits=15, decimal_places=4, default=Decimal('0'), help_text='Unit cost at transaction')
+    average_cost = models.DecimalField(max_digits=15, decimal_places=4, default=Decimal('0'), help_text='Average cost after transaction')
+    
+    # Value details
+    value_in = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0'), help_text='Value of stock received')
+    value_out = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0'), help_text='Value of stock issued')
+    balance_value = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0'), help_text='Running balance value')
+    
+    # GST details
+    gst_rate = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0'))
+    gst_amount_in = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0'))
+    gst_amount_out = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0'))
+    
+    # Party information
+    party = models.ForeignKey(Party, on_delete=models.SET_NULL, null=True, blank=True, related_name='stock_movements')
+    
+    # Reference to source document
+    stock_invoice = models.ForeignKey(StockInvoice, on_delete=models.CASCADE, null=True, blank=True, related_name='movements')
+    line_item = models.ForeignKey(StockInvoiceLineItem, on_delete=models.CASCADE, null=True, blank=True, related_name='movements')
+    
+    # System fields
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'stock_movements'
+        verbose_name = 'Stock Movement'
+        verbose_name_plural = 'Stock Movements'
+        ordering = ['movement_date', 'created_at']
+        indexes = [
+            models.Index(fields=['company', 'product', 'movement_date']),
+            models.Index(fields=['financial_year', 'movement_type']),
+            models.Index(fields=['product', 'movement_date']),
+        ]
+    
+    def __str__(self):
+        return f"{self.product.code} - {self.movement_type} - {self.movement_date}"
+    
+    @classmethod
+    def create_from_line_item(cls, line_item):
+        """Create stock movement from invoice line item with average cost calculation"""
+        invoice = line_item.stock_invoice
+        product = line_item.product
+        
+        # Determine movement direction
+        is_inward = invoice.invoice_type in ['purchase', 'import', 'sale_return']
+        
+        # Get previous balance
+        last_movement = cls.objects.filter(
+            company=invoice.company,
+            product=product,
+            movement_date__lte=invoice.invoice_date
+        ).order_by('-movement_date', '-created_at').first()
+        
+        prev_balance_qty = last_movement.balance_quantity if last_movement else Decimal('0')
+        prev_balance_value = last_movement.balance_value if last_movement else Decimal('0')
+        prev_avg_cost = last_movement.average_cost if last_movement else Decimal('0')
+        
+        # Calculate new values
+        if is_inward:
+            quantity_in = line_item.quantity
+            quantity_out = Decimal('0')
+            value_in = line_item.amount_ex_gst
+            value_out = Decimal('0')
+            gst_amount_in = line_item.gst_value
+            gst_amount_out = Decimal('0')
+            unit_cost = line_item.unit_price
+            
+            # Calculate average cost (weighted average)
+            new_balance_qty = prev_balance_qty + quantity_in
+            new_balance_value = prev_balance_value + value_in
+            
+            if new_balance_qty > 0:
+                average_cost = new_balance_value / new_balance_qty
+            else:
+                average_cost = unit_cost
+        else:
+            quantity_in = Decimal('0')
+            quantity_out = line_item.quantity
+            value_in = Decimal('0')
+            # Use average cost for outward movements
+            value_out = line_item.quantity * prev_avg_cost if prev_avg_cost > 0 else line_item.amount_ex_gst
+            gst_amount_in = Decimal('0')
+            gst_amount_out = line_item.gst_value
+            unit_cost = prev_avg_cost if prev_avg_cost > 0 else line_item.unit_price
+            
+            new_balance_qty = prev_balance_qty - quantity_out
+            new_balance_value = prev_balance_value - value_out
+            average_cost = prev_avg_cost
+        
+        # Create movement record
+        movement = cls.objects.create(
+            company=invoice.company,
+            financial_year=invoice.financial_year,
+            product=product,
+            movement_type=invoice.invoice_type,
+            movement_date=invoice.invoice_date,
+            reference_number=invoice.invoice_number,
+            quantity_in=quantity_in,
+            quantity_out=quantity_out,
+            balance_quantity=new_balance_qty,
+            unit_cost=unit_cost,
+            average_cost=average_cost,
+            value_in=value_in,
+            value_out=value_out,
+            balance_value=new_balance_value,
+            gst_rate=line_item.gst_rate,
+            gst_amount_in=gst_amount_in,
+            gst_amount_out=gst_amount_out,
+            party=invoice.party,
+            stock_invoice=invoice,
+            line_item=line_item,
+            created_by=invoice.created_by
+        )
+        
+        # Update subsequent movements if any
+        cls._recalculate_subsequent_movements(product, invoice.invoice_date, movement.id)
+        
+        return movement
+    
+    @classmethod
+    def _recalculate_subsequent_movements(cls, product, from_date, exclude_id=None):
+        """Recalculate all subsequent movements after a change"""
+        movements = cls.objects.filter(
+            product=product,
+            movement_date__gte=from_date
+        ).order_by('movement_date', 'created_at')
+        
+        if exclude_id:
+            movements = movements.exclude(id=exclude_id)
+        
+        running_qty = Decimal('0')
+        running_value = Decimal('0')
+        running_avg_cost = Decimal('0')
+        
+        # Get the last movement before the from_date
+        prev_movement = cls.objects.filter(
+            product=product,
+            movement_date__lt=from_date
+        ).order_by('-movement_date', '-created_at').first()
+        
+        if prev_movement:
+            running_qty = prev_movement.balance_quantity
+            running_value = prev_movement.balance_value
+            running_avg_cost = prev_movement.average_cost
+        
+        for movement in movements:
+            if movement.quantity_in > 0:  # Inward movement
+                new_qty = running_qty + movement.quantity_in
+                new_value = running_value + movement.value_in
+                if new_qty > 0:
+                    running_avg_cost = new_value / new_qty
+                running_qty = new_qty
+                running_value = new_value
+            else:  # Outward movement
+                movement.value_out = movement.quantity_out * running_avg_cost
+                running_qty -= movement.quantity_out
+                running_value -= movement.value_out
+            
+            movement.balance_quantity = running_qty
+            movement.balance_value = running_value
+            movement.average_cost = running_avg_cost
+            movement.save(update_fields=['balance_quantity', 'balance_value', 'average_cost', 'value_out'])
+
+
+class StockMovementReport:
+    """Helper class for generating stock movement reports with grouping"""
+    
+    def __init__(self, company, financial_year=None):
+        self.company = company
+        self.financial_year = financial_year
+    
+    def get_movements(self, product=None, hs_code=None, category=None, 
+                     date_from=None, date_to=None, movement_type=None):
+        """Get stock movements with optional filters"""
+        queryset = StockMovement.objects.filter(company=self.company)
+        
+        if self.financial_year:
+            queryset = queryset.filter(financial_year=self.financial_year)
+        
+        if product:
+            queryset = queryset.filter(product=product)
+        
+        if hs_code:
+            queryset = queryset.filter(product__category__hs_code=hs_code)
+        
+        if category:
+            queryset = queryset.filter(product__category=category)
+        
+        if date_from:
+            queryset = queryset.filter(movement_date__gte=date_from)
+        
+        if date_to:
+            queryset = queryset.filter(movement_date__lte=date_to)
+        
+        if movement_type:
+            queryset = queryset.filter(movement_type=movement_type)
+        
+        return queryset.select_related(
+            'product', 'product__category', 'product__category__hs_code', 
+            'party', 'stock_invoice'
+        ).order_by('movement_date', 'created_at')
+    
+    def get_grouped_report(self, group_by='product', **filters):
+        """Generate grouped stock movement report"""
+        movements = self.get_movements(**filters)
+        
+        if group_by == 'hs_code':
+            return self._group_by_hs_code(movements)
+        elif group_by == 'category':
+            return self._group_by_category(movements)
+        elif group_by == 'product':
+            return self._group_by_product(movements)
+        else:
+            return list(movements)
+    
+    def _group_by_hs_code(self, movements):
+        """Group movements by HS Code"""
+        from collections import defaultdict
+        grouped = defaultdict(list)
+        
+        for movement in movements:
+            hs_code = movement.product.category.hs_code
+            grouped[hs_code].append(movement)
+        
+        return dict(grouped)
+    
+    def _group_by_category(self, movements):
+        """Group movements by Category"""
+        from collections import defaultdict
+        grouped = defaultdict(list)
+        
+        for movement in movements:
+            category = movement.product.category
+            grouped[category].append(movement)
+        
+        return dict(grouped)
+    
+    def _group_by_product(self, movements):
+        """Group movements by Product"""
+        from collections import defaultdict
+        grouped = defaultdict(list)
+        
+        for movement in movements:
+            product = movement.product
+            grouped[product].append(movement)
+        
+        return dict(grouped)
+    
+    def get_summary_report(self, group_by='product', **filters):
+        """Generate summary report with totals"""
+        grouped_movements = self.get_grouped_report(group_by, **filters)
+        summary = []
+        
+        for group_key, movements in grouped_movements.items():
+            total_qty_in = sum(m.quantity_in for m in movements)
+            total_qty_out = sum(m.quantity_out for m in movements)
+            total_value_in = sum(m.value_in for m in movements)
+            total_value_out = sum(m.value_out for m in movements)
+            total_gst_in = sum(m.gst_amount_in for m in movements)
+            total_gst_out = sum(m.gst_amount_out for m in movements)
+            
+            # Get final balance from last movement
+            last_movement = movements[-1] if movements else None
+            final_balance_qty = last_movement.balance_quantity if last_movement else 0
+            final_balance_value = last_movement.balance_value if last_movement else 0
+            final_avg_cost = last_movement.average_cost if last_movement else 0
+            
+            summary.append({
+                'group': group_key,
+                'group_name': str(group_key),
+                'total_quantity_in': total_qty_in,
+                'total_quantity_out': total_qty_out,
+                'net_quantity': total_qty_in - total_qty_out,
+                'total_value_in': total_value_in,
+                'total_value_out': total_value_out,
+                'net_value': total_value_in - total_value_out,
+                'total_gst_in': total_gst_in,
+                'total_gst_out': total_gst_out,
+                'net_gst': total_gst_in - total_gst_out,
+                'final_balance_quantity': final_balance_qty,
+                'final_balance_value': final_balance_value,
+                'final_average_cost': final_avg_cost,
+                'movement_count': len(movements),
+                'movements': movements
+            })
+        
+        return summary

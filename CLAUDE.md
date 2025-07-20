@@ -285,3 +285,5 @@ on base of their nature to different files into a grouper folder""
 > servers are already running using systemctl just restart when you make changes
 
 When you create a component make sure it is not already exisiting and if you need to make and you do have to make then use builtin components using shadecn and radixui latest versions
+
+  use shadcn radixui pre built components always

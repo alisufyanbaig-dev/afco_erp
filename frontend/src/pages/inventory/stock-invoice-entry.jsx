@@ -1,24 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Save, Check } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
+import { ArrowLeft, Plus, Trash2, Save } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { stockInvoiceService, productService } from '@/services/api';
+import { stockInvoiceService, productService, partyService } from '@/services/api';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { useUserActivity } from '@/contexts/UserActivityContext';
 import toast from 'react-hot-toast';
 
 const StockInvoiceEntryPage = () => {
+  const { id } = useParams();
+  const isEdit = Boolean(id);
   const { userActivity } = useUserActivity();
   const [invoiceTypes, setInvoiceTypes] = useState([]);
   const [products, setProducts] = useState([]);
+  const [parties, setParties] = useState([]);
+  const [partiesLoading, setPartiesLoading] = useState(false);
+  const [selectedParty, setSelectedParty] = useState(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     invoice_type: 'purchase',
     invoice_date: new Date().toISOString().split('T')[0],
-    party_name: '',
-    party_address: '',
-    party_contact: '',
+    party: '',
     reference_number: '',
     notes: '',
     line_items: []
@@ -28,7 +33,48 @@ const StockInvoiceEntryPage = () => {
   useEffect(() => {
     loadInvoiceTypes();
     loadProducts();
-  }, []);
+    
+    // Load invoice data if editing
+    if (isEdit && id) {
+      loadInvoice();
+    }
+  }, [id]);
+
+  const loadInvoice = async () => {
+    try {
+      setLoading(true);
+      const response = await stockInvoiceService.get(id);
+      if (response.success) {
+        const invoice = response.data;
+        setFormData({
+          invoice_type: invoice.invoice_type,
+          invoice_date: invoice.invoice_date,
+          party: invoice.party,
+          reference_number: invoice.reference_number || '',
+          notes: invoice.notes || '',
+          line_items: invoice.line_items || []
+        });
+        
+        // Set selected party for auto-population
+        if (invoice.party) {
+          const partyData = await partyService.get(invoice.party);
+          if (partyData.success) {
+            const party = {
+              value: partyData.data.id,
+              label: `${partyData.data.name} - ${partyData.data.party_type_display}`,
+              ...partyData.data
+            };
+            setSelectedParty(party);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading invoice:', error);
+      toast.error('Failed to load invoice details');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadInvoiceTypes = async () => {
     try {
@@ -52,6 +98,40 @@ const StockInvoiceEntryPage = () => {
     }
   };
 
+  const loadParties = useCallback(async (searchTerm = '') => {
+    try {
+      setPartiesLoading(true);
+      const response = await partyService.search(searchTerm);
+      if (response.success && response.data) {
+        const partyOptions = response.data.map(party => ({
+          value: party.id,
+          label: `${party.name} - ${party.party_type_display}`,
+          ...party
+        }));
+        setParties(partyOptions);
+        return partyOptions;
+      } else {
+        setParties([]);
+        return [];
+      }
+    } catch (error) {
+      console.error('Error loading parties:', error);
+      setParties([]);
+      return [];
+    } finally {
+      setPartiesLoading(false);
+    }
+  }, []);
+
+  const handlePartyChange = (partyId) => {
+    const party = parties.find(p => p.value == partyId);
+    setSelectedParty(party);
+    setFormData(prev => ({
+      ...prev,
+      party: partyId
+    }));
+  };
+
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -62,9 +142,11 @@ const StockInvoiceEntryPage = () => {
   const addLineItem = () => {
     const newLineItem = {
       product: '',
+      serial_number: '',
       quantity: 1,
       unit_price: 0,
       gst_rate: 0,
+      gst_value: 0,
       description: ''
     };
     setFormData(prev => ({
@@ -91,7 +173,15 @@ const StockInvoiceEntryPage = () => {
 
   const calculateLineTotal = (item) => {
     const subtotal = parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0);
-    const gstAmount = subtotal * (parseFloat(item.gst_rate || 0) / 100);
+    let gstAmount = 0;
+    
+    // Calculate GST amount based on whether rate or value is provided
+    if (item.gst_value && parseFloat(item.gst_value) > 0) {
+      gstAmount = parseFloat(item.gst_value);
+    } else if (item.gst_rate && parseFloat(item.gst_rate) > 0) {
+      gstAmount = subtotal * (parseFloat(item.gst_rate) / 100);
+    }
+    
     return subtotal + gstAmount;
   };
 
@@ -99,9 +189,9 @@ const StockInvoiceEntryPage = () => {
     return formData.line_items.reduce((total, item) => total + calculateLineTotal(item), 0);
   };
 
-  const handleSaveDraft = async () => {
-    if (!formData.party_name.trim()) {
-      toast.error('Party name is required');
+  const handleSaveInvoice = async () => {
+    if (!formData.party) {
+      toast.error('Party is required');
       return;
     }
 
@@ -121,24 +211,26 @@ const StockInvoiceEntryPage = () => {
 
     try {
       setLoading(true);
-      const response = await stockInvoiceService.create(formData);
+      let response;
+      
+      if (isEdit) {
+        response = await stockInvoiceService.update(id, formData);
+      } else {
+        response = await stockInvoiceService.create(formData);
+      }
+      
       if (response.success) {
-        toast.success('Stock invoice saved as draft');
+        toast.success(`Stock invoice ${isEdit ? 'updated' : 'created'} successfully`);
         window.location.href = '/inventory/stock-invoices';
       }
     } catch (error) {
       console.error('Error saving invoice:', error);
-      toast.error('Failed to save invoice');
+      toast.error(`Failed to ${isEdit ? 'update' : 'create'} invoice`);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleConfirmInvoice = async () => {
-    // First save as draft, then confirm
-    await handleSaveDraft();
-    // Note: In a real implementation, you'd save first, then call confirm API
-  };
 
   const getSelectedProduct = (productId) => {
     return products.find(p => p.id === parseInt(productId));
@@ -172,9 +264,11 @@ const StockInvoiceEntryPage = () => {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Create Stock Invoice</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {isEdit ? 'Edit Stock Invoice' : 'Create Stock Invoice'}
+          </h1>
           <p className="text-muted-foreground">
-            Add a new stock invoice for inventory management
+            {isEdit ? 'Update stock invoice details' : 'Add a new stock invoice for inventory management'}
           </p>
         </div>
       </div>
@@ -218,24 +312,20 @@ const StockInvoiceEntryPage = () => {
             />
           </div>
 
-          {/* Party Name */}
+          {/* Party */}
           <div>
-            <label className="block text-sm font-medium mb-2">Party Name *</label>
-            <Input
-              value={formData.party_name}
-              onChange={(e) => handleInputChange('party_name', e.target.value)}
-              placeholder="Enter party name"
-              required
-            />
-          </div>
-
-          {/* Party Contact */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Party Contact</label>
-            <Input
-              value={formData.party_contact}
-              onChange={(e) => handleInputChange('party_contact', e.target.value)}
-              placeholder="Enter phone/email"
+            <label className="block text-sm font-medium mb-2">Party *</label>
+            <SearchableSelect
+              value={formData.party}
+              onValueChange={handlePartyChange}
+              onSearch={loadParties}
+              options={parties}
+              placeholder="Search and select party..."
+              searchPlaceholder="Type to search parties..."
+              emptyMessage="No parties found."
+              loading={partiesLoading}
+              getOptionLabel={(option) => option.label}
+              getOptionValue={(option) => option.value}
             />
           </div>
 
@@ -246,16 +336,6 @@ const StockInvoiceEntryPage = () => {
               value={formData.notes}
               onChange={(e) => handleInputChange('notes', e.target.value)}
               placeholder="Enter notes"
-            />
-          </div>
-
-          {/* Party Address - Full width */}
-          <div className="md:col-span-3">
-            <label className="block text-sm font-medium mb-2">Party Address</label>
-            <Input
-              value={formData.party_address}
-              onChange={(e) => handleInputChange('party_address', e.target.value)}
-              placeholder="Enter party address"
             />
           </div>
         </div>
@@ -279,9 +359,9 @@ const StockInvoiceEntryPage = () => {
           <div className="space-y-4">
             {formData.line_items.map((item, index) => (
               <Card key={index} className="p-4">
-                <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+                <div className="grid grid-cols-1 xl:grid-cols-10 gap-4 items-end">
                   {/* Product */}
-                  <div>
+                  <div className="xl:col-span-3">
                     <label className="block text-sm font-medium mb-2">Product *</label>
                     <select
                       value={item.product}
@@ -299,7 +379,7 @@ const StockInvoiceEntryPage = () => {
                   </div>
 
                   {/* Quantity */}
-                  <div>
+                  <div className="xl:col-span-1">
                     <label className="block text-sm font-medium mb-2">Quantity *</label>
                     <Input
                       type="number"
@@ -313,7 +393,7 @@ const StockInvoiceEntryPage = () => {
                   </div>
 
                   {/* Unit Price */}
-                  <div>
+                  <div className="xl:col-span-1">
                     <label className="block text-sm font-medium mb-2">Unit Price</label>
                     <Input
                       type="number"
@@ -325,8 +405,16 @@ const StockInvoiceEntryPage = () => {
                     />
                   </div>
 
+                  {/* Amount Ex-GST */}
+                  <div className="xl:col-span-1">
+                    <label className="block text-sm font-medium mb-2">Amount Ex-GST</label>
+                    <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md text-right font-medium">
+                      ₨ {(parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0)).toFixed(2)}
+                    </div>
+                  </div>
+
                   {/* GST Rate */}
-                  <div>
+                  <div className="xl:col-span-1">
                     <label className="block text-sm font-medium mb-2">GST Rate (%)</label>
                     <Input
                       type="number"
@@ -334,21 +422,46 @@ const StockInvoiceEntryPage = () => {
                       min="0"
                       max="100"
                       value={item.gst_rate}
-                      onChange={(e) => updateLineItem(index, 'gst_rate', e.target.value)}
+                      onChange={(e) => {
+                        updateLineItem(index, 'gst_rate', e.target.value);
+                        // Clear GST value when rate is entered
+                        if (e.target.value) {
+                          updateLineItem(index, 'gst_value', 0);
+                        }
+                      }}
                       placeholder="0.00"
                     />
                   </div>
 
-                  {/* Total */}
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Total</label>
+                  {/* GST Value */}
+                  <div className="xl:col-span-1">
+                    <label className="block text-sm font-medium mb-2">OR GST Value</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={item.gst_value}
+                      onChange={(e) => {
+                        updateLineItem(index, 'gst_value', e.target.value);
+                        // Clear GST rate when value is entered
+                        if (e.target.value) {
+                          updateLineItem(index, 'gst_rate', 0);
+                        }
+                      }}
+                      placeholder="0.00"
+                    />
+                  </div>
+
+                  {/* Total Including GST */}
+                  <div className="xl:col-span-1">
+                    <label className="block text-sm font-medium mb-2">Total Inc-GST</label>
                     <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md text-right font-medium">
                       ₨ {calculateLineTotal(item).toFixed(2)}
                     </div>
                   </div>
 
                   {/* Remove Button */}
-                  <div>
+                  <div className="xl:col-span-1 flex items-end">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -357,16 +470,6 @@ const StockInvoiceEntryPage = () => {
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
-                  </div>
-
-                  {/* Description - Full width */}
-                  <div className="md:col-span-6">
-                    <label className="block text-sm font-medium mb-2">Description</label>
-                    <Input
-                      value={item.description}
-                      onChange={(e) => updateLineItem(index, 'description', e.target.value)}
-                      placeholder="Enter item description (optional)"
-                    />
                   </div>
                 </div>
               </Card>
@@ -397,19 +500,11 @@ const StockInvoiceEntryPage = () => {
           Cancel
         </Button>
         <Button
-          variant="outline"
-          onClick={handleSaveDraft}
+          onClick={handleSaveInvoice}
           disabled={loading}
         >
           <Save className="h-4 w-4 mr-2" />
-          Save as Draft
-        </Button>
-        <Button
-          onClick={handleConfirmInvoice}
-          disabled={loading}
-        >
-          <Check className="h-4 w-4 mr-2" />
-          Save & Confirm
+          {loading ? 'Saving...' : (isEdit ? 'Update Invoice' : 'Save Invoice')}
         </Button>
       </div>
     </div>

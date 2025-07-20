@@ -68,10 +68,13 @@ const navigationItems = [
     title: "Inventory",
     icon: Package,
     children: [
+      { title: "Parties", icon: Users, href: "/inventory/parties" },
       { title: "HS Codes", icon: Tag, href: "/inventory/hs-codes" },
       { title: "Categories", icon: Archive, href: "/inventory/categories" },
       { title: "Products", icon: Package, href: "/inventory/products" },
       { title: "Stock Invoices", icon: Receipt, href: "/inventory/stock-invoices" },
+      { title: "Stock Movement Report", icon: TrendingUp, href: "/inventory/reports/stock-movement" },
+      { title: "Stock Valuation Report", icon: PieChart, href: "/inventory/reports/stock-valuation" },
     ],
   },
   {
@@ -316,3 +319,5 @@ export function DashboardLayout({ children }) {
     </div>
   )
 }
+
+export default DashboardLayout;
