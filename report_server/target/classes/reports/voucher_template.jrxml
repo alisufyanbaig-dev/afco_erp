@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports 
+             http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+             name="voucher_template"
+             pageWidth="595"
+             pageHeight="842"
+             columnWidth="555"
+             leftMargin="20"
+             rightMargin="20"
+             topMargin="20"
+             bottomMargin="20">
+
+    <!-- Report Parameters -->
+    <parameter name="voucherNumber" class="java.lang.String"/>
+    <parameter name="voucherType" class="java.lang.String"/>
+    <parameter name="voucherDate" class="java.lang.String"/>
+    <parameter name="description" class="java.lang.String"/>
+    <parameter name="companyName" class="java.lang.String"/>
+    <parameter name="companyAddress" class="java.lang.String"/>
+    <parameter name="totalAmount" class="java.math.BigDecimal"/>
+
+    <!-- Fields for line entries -->
+    <field name="accountCode" class="java.lang.String"/>
+    <field name="accountName" class="java.lang.String"/>
+    <field name="description" class="java.lang.String"/>
+    <field name="debitAmount" class="java.math.BigDecimal"/>
+    <field name="creditAmount" class="java.math.BigDecimal"/>
+
+    <!-- Variables for totals -->
+    <variable name="totalDebit" class="java.math.BigDecimal" calculation="Sum">
+        <variableExpression><![CDATA[$F{debitAmount}]]></variableExpression>
+        <initialValueExpression><![CDATA[new java.math.BigDecimal(0)]]></initialValueExpression>
+    </variable>
+    <variable name="totalCredit" class="java.math.BigDecimal" calculation="Sum">
+        <variableExpression><![CDATA[$F{creditAmount}]]></variableExpression>
+        <initialValueExpression><![CDATA[new java.math.BigDecimal(0)]]></initialValueExpression>
+    </variable>
+
+    <!-- Page Header -->
+    <pageHeader>
+        <band height="120" splitType="Stretch">
+            <!-- Company Name -->
+            <textField>
+                <reportElement x="0" y="10" width="555" height="25"/>
+                <textElement textAlignment="Center">
+                    <font size="18" isBold="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{companyName}]]></textFieldExpression>
+            </textField>
+            
+            <!-- Company Address -->
+            <textField>
+                <reportElement x="0" y="35" width="555" height="20"/>
+                <textElement textAlignment="Center">
+                    <font size="12"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{companyAddress}]]></textFieldExpression>
+            </textField>
+
+            <!-- Voucher Title -->
+            <textField>
+                <reportElement x="0" y="65" width="555" height="25"/>
+                <textElement textAlignment="Center">
+                    <font size="16" isBold="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{voucherType} + " VOUCHER"]]></textFieldExpression>
+            </textField>
+
+            <!-- Voucher Details -->
+            <staticText>
+                <reportElement x="0" y="95" width="100" height="20"/>
+                <textElement>
+                    <font size="10" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Voucher No:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="100" y="95" width="150" height="20"/>
+                <textElement>
+                    <font size="10"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{voucherNumber}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="350" y="95" width="80" height="20"/>
+                <textElement>
+                    <font size="10" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Date:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="430" y="95" width="125" height="20"/>
+                <textElement>
+                    <font size="10"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{voucherDate}]]></textFieldExpression>
+            </textField>
+        </band>
+    </pageHeader>
+
+    <!-- Column Header -->
+    <columnHeader>
+        <band height="40" splitType="Stretch">
+            <!-- Table headers -->
+            <staticText>
+                <reportElement mode="Opaque" x="0" y="0" width="80" height="40" backcolor="#E6E6E6"/>
+                <box>
+                    <pen lineWidth="0.5"/>
+                </box>
+                <textElement textAlignment="Center" verticalAlignment="Middle">
+                    <font size="10" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Account Code]]></text>
+            </staticText>
+            
+            <staticText>
+                <reportElement mode="Opaque" x="80" y="0" width="150" height="40" backcolor="#E6E6E6"/>
+                <box>
+                    <pen lineWidth="0.5"/>
+                </box>
+                <textElement textAlignment="Center" verticalAlignment="Middle">
+                    <font size="10" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Account Name]]></text>
+            </staticText>
+
+            <staticText>
+                <reportElement mode="Opaque" x="230" y="0" width="155" height="40" backcolor="#E6E6E6"/>
+                <box>
+                    <pen lineWidth="0.5"/>
+                </box>
+                <textElement textAlignment="Center" verticalAlignment="Middle">
+                    <font size="10" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Description]]></text>
+            </staticText>
+
+            <staticText>
+                <reportElement mode="Opaque" x="385" y="0" width="85" height="40" backcolor="#E6E6E6"/>
+                <box>
+                    <pen lineWidth="0.5"/>
+                </box>
+                <textElement textAlignment="Center" verticalAlignment="Middle">
+                    <font size="10" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Debit]]></text>
+            </staticText>
+
+            <staticText>
+                <reportElement mode="Opaque" x="470" y="0" width="85" height="40" backcolor="#E6E6E6"/>
+                <box>
+                    <pen lineWidth="0.5"/>
+                </box>
+                <textElement textAlignment="Center" verticalAlignment="Middle">
+                    <font size="10" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Credit]]></text>
+            </staticText>
+        </band>
+    </columnHeader>
+
+    <!-- Detail Band -->
+    <detail>
+        <band height="30" splitType="Stretch">
+            <textField>
+                <reportElement x="0" y="0" width="80" height="30"/>
+                <box>
+                    <pen lineWidth="0.5"/>
+                </box>
+                <textElement textAlignment="Center" verticalAlignment="Middle">
+                    <font size="9"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{accountCode}]]></textFieldExpression>
+            </textField>
+
+            <textField>
+                <reportElement x="80" y="0" width="150" height="30"/>
+                <box>
+                    <pen lineWidth="0.5"/>
+                </box>
+                <textElement verticalAlignment="Middle">
+                    <font size="9"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{accountName}]]></textFieldExpression>
+            </textField>
+
+            <textField>
+                <reportElement x="230" y="0" width="155" height="30"/>
+                <box>
+                    <pen lineWidth="0.5"/>
+                </box>
+                <textElement verticalAlignment="Middle">
+                    <font size="9"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{description}]]></textFieldExpression>
+            </textField>
+
+            <textField pattern="#,##0.00">
+                <reportElement x="385" y="0" width="85" height="30"/>
+                <box>
+                    <pen lineWidth="0.5"/>
+                </box>
+                <textElement textAlignment="Right" verticalAlignment="Middle">
+                    <font size="9"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{debitAmount}]]></textFieldExpression>
+            </textField>
+
+            <textField pattern="#,##0.00">
+                <reportElement x="470" y="0" width="85" height="30"/>
+                <box>
+                    <pen lineWidth="0.5"/>
+                </box>
+                <textElement textAlignment="Right" verticalAlignment="Middle">
+                    <font size="9"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$F{creditAmount}]]></textFieldExpression>
+            </textField>
+        </band>
+    </detail>
+
+    <!-- Summary Band -->
+    <summary>
+        <band height="80" splitType="Stretch">
+            <!-- Total Row -->
+            <staticText>
+                <reportElement mode="Opaque" x="230" y="0" width="155" height="30" backcolor="#F0F0F0"/>
+                <box>
+                    <pen lineWidth="0.5"/>
+                </box>
+                <textElement textAlignment="Center" verticalAlignment="Middle">
+                    <font size="10" isBold="true"/>
+                </textElement>
+                <text><![CDATA[TOTAL]]></text>
+            </staticText>
+
+            <textField pattern="#,##0.00">
+                <reportElement mode="Opaque" x="385" y="0" width="85" height="30" backcolor="#F0F0F0"/>
+                <box>
+                    <pen lineWidth="0.5"/>
+                </box>
+                <textElement textAlignment="Right" verticalAlignment="Middle">
+                    <font size="10" isBold="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$V{totalDebit}]]></textFieldExpression>
+            </textField>
+
+            <textField pattern="#,##0.00">
+                <reportElement mode="Opaque" x="470" y="0" width="85" height="30" backcolor="#F0F0F0"/>
+                <box>
+                    <pen lineWidth="0.5"/>
+                </box>
+                <textElement textAlignment="Right" verticalAlignment="Middle">
+                    <font size="10" isBold="true"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$V{totalCredit}]]></textFieldExpression>
+            </textField>
+
+            <!-- Description if available -->
+            <staticText>
+                <reportElement x="0" y="40" width="100" height="20"/>
+                <textElement>
+                    <font size="10" isBold="true"/>
+                </textElement>
+                <text><![CDATA[Description:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="100" y="40" width="455" height="20"/>
+                <textElement>
+                    <font size="10"/>
+                </textElement>
+                <textFieldExpression><![CDATA[$P{description}]]></textFieldExpression>
+            </textField>
+        </band>
+    </summary>
+</jasperReport>

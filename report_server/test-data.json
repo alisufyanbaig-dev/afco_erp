@@ -1,0 +1,25 @@
+{
+  "voucherNumber": "JV-2024-001",
+  "voucherType": "JOURNAL",
+  "voucherDate": "2024-12-21",
+  "description": "Opening entries for cash and capital account",
+  "totalAmount": 100000.00,
+  "companyName": "AFCO ERP Company",
+  "companyAddress": "123 Business Street, Karachi, Pakistan",
+  "lineEntries": [
+    {
+      "accountCode": "1-1-1",
+      "accountName": "Cash in Hand",
+      "description": "Opening cash balance",
+      "debitAmount": 100000.00,
+      "creditAmount": 0.00
+    },
+    {
+      "accountCode": "4-1-1", 
+      "accountName": "Capital Account",
+      "description": "Owner's capital",
+      "debitAmount": 0.00,
+      "creditAmount": 100000.00
+    }
+  ]
+}
