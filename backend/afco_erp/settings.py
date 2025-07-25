@@ -174,8 +174,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "http://localhost:3501",
-    "http://127.0.0.1:3501",
+    "http://localhost:3500",
+    "http://127.0.0.1:3500",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -188,6 +188,60 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:3000", 
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "http://localhost:3501",
-    "http://127.0.0.1:3501",
+    "http://localhost:3500",
+    "http://127.0.0.1:3500",
 ]
+
+# Report Server Settings
+REPORT_SERVER_URL = 'http://localhost:3502'
+REPORT_CACHE_ENABLED = True
+REPORT_CACHE_HOURS = 24
+
+# Media files (for report caching)
+MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_URL = '/media/'
+
+# Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'logs' / 'django.log',
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'root': {
+        'handlers': ['console', 'file'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'reports': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}

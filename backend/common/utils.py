@@ -2,6 +2,9 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from typing import Any, Optional, Dict
+import requests
+import logging
+from django.conf import settings
 
 
 class APIResponse:
@@ -316,3 +319,96 @@ class StandardPagination(PageNumberPagination):
             },
             message="Data retrieved successfully"
         )
+
+
+logger = logging.getLogger(__name__)
+
+
+class ReportClient:
+    """
+    Simple client for communicating with the JasperReports server.
+    Makes direct HTTP requests to generate PDF reports.
+    """
+    
+    def __init__(self):
+        self.base_url = getattr(settings, 'REPORT_SERVER_URL', 'http://localhost:3502')
+        self.timeout = 30  # 30 seconds timeout
+    
+    def generate_voucher_pdf(self, voucher_data: Dict) -> tuple[bool, bytes, str]:
+        """
+        Generate a voucher PDF report.
+        
+        Args:
+            voucher_data: Dictionary containing voucher data
+            
+        Returns:
+            tuple: (success: bool, pdf_bytes: bytes, error_message: str)
+        """
+        url = f"{self.base_url}/api/reports/voucher/pdf"
+        
+        try:
+            logger.info(f"Generating voucher PDF report: {voucher_data.get('voucherNumber', 'Unknown')}")
+            
+            response = requests.post(
+                url,
+                json=voucher_data,
+                timeout=self.timeout,
+                headers={'Content-Type': 'application/json'}
+            )
+            
+            if response.status_code == 200:
+                logger.info("Voucher PDF generated successfully")
+                return True, response.content, ""
+            else:
+                error_msg = f"Report server returned status {response.status_code}: {response.text}"
+                logger.error(error_msg)
+                return False, b"", error_msg
+                
+        except requests.exceptions.ConnectionError:
+            error_msg = "Could not connect to report server. Please ensure the report server is running."
+            logger.error(error_msg)
+            return False, b"", error_msg
+            
+        except requests.exceptions.Timeout:
+            error_msg = f"Report generation timed out after {self.timeout} seconds"
+            logger.error(error_msg)
+            return False, b"", error_msg
+            
+        except Exception as e:
+            error_msg = f"Unexpected error generating report: {str(e)}"
+            logger.error(error_msg)
+            return False, b"", error_msg
+    
+    def check_server_health(self) -> bool:
+        """
+        Check if the report server is healthy and responding.
+        
+        Returns:
+            bool: True if server is healthy, False otherwise
+        """
+        url = f"{self.base_url}/actuator/health"
+        
+        try:
+            response = requests.get(url, timeout=5)
+            return response.status_code == 200
+        except Exception:
+            return False
+
+
+# Global report client instance
+_report_client = None
+
+
+def get_report_client() -> ReportClient:
+    """
+    Get the global report client instance.
+    
+    Returns:
+        ReportClient: Global report client instance
+    """
+    global _report_client
+    
+    if _report_client is None:
+        _report_client = ReportClient()
+    
+    return _report_client

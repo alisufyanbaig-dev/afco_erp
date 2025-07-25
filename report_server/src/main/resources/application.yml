@@ -1,11 +1,128 @@
 server:
-  port: 8080
+  port: 3502
+  shutdown: graceful
+  tomcat:
+    connection-timeout: 20000
+    max-connections: 200
+    threads:
+      max: 100
+      min-spare: 10
 
 spring:
   application:
-    name: afco-report-server
+    name: AFCO ERP Report Server
+  main:
+    banner-mode: console
+  profiles:
+    active: development
+  jackson:
+    serialization:
+      indent-output: true
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  info:
+    env:
+      enabled: true
+    git:
+      mode: full
+  health:
+    defaults:
+      enabled: true
+
+# Application configuration
+afco:
+  erp:
+    report:
+      # Report generation settings
+      timeout: 30000  # 30 seconds
+      max-concurrent-reports: 10
+      temp-directory: ${java.io.tmpdir}/afco-reports
+      
+      # Template settings
+      template-directory: classpath:reports/
+      default-format: PDF
+      
+      # Performance settings
+      cache-templates: true
+      pool-size: 5
+
+# CORS Configuration
+cors:
+  allowed-origins:
+    - "http://localhost:3500"
+    - "http://localhost:3501"
+    - "http://127.0.0.1:3500"
+    - "http://127.0.0.1:3501"
+  allowed-methods:
+    - GET
+    - POST
+    - OPTIONS
+  allowed-headers:
+    - "*"
+  allow-credentials: true
+
+# Logging configuration
+logging:
+  level:
+    root: INFO
+    com.afco.erp: DEBUG
+    org.springframework: INFO
+    org.springframework.web: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/report-server.log
+    max-size: 10MB
+    max-history: 30
+
+---
+# Development profile
+spring:
+  config:
+    activate:
+      on-profile: development
+  
+logging:
+  level:
+    com.afco.erp: DEBUG
+    org.springframework.web: DEBUG
+
+afco:
+  erp:
+    report:
+      cache-templates: false  # Disable caching in development for easier template changes
+
+---
+# Production profile  
+spring:
+  config:
+    activate:
+      on-profile: production
 
 logging:
   level:
-    com.afco.erp.reportserver: INFO
-    org.springframework.web: INFO
+    root: WARN
+    com.afco.erp: INFO
+  file:
+    name: /var/log/afco-erp/report-server.log
+
+afco:
+  erp:
+    report:
+      cache-templates: true
+      max-concurrent-reports: 20
+      pool-size: 10

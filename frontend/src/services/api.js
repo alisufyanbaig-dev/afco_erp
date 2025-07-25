@@ -2,7 +2,7 @@ import toast from 'react-hot-toast';
 
 // Configuration
 const API_CONFIG = {
-  baseURL: 'http://localhost:3500/api',
+  baseURL: 'http://localhost:3501/api',
   timeout: 30000, // 30 seconds
   retryAttempts: 3,
   retryDelay: 1000, // 1 second

@@ -16,6 +16,7 @@ urlpatterns = [
     path('voucher-types/', views.voucher_types, name='voucher-types'),
     
     # Reports URLs
+    path('vouchers/<int:voucher_id>/pdf/', views.voucher_pdf_report, name='voucher-pdf-report'),
     path('ledger-report/', views.ledger_report, name='ledger-report'),
     path('trial-balance/', views.trial_balance, name='trial-balance'),
 ]

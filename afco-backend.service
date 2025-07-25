@@ -1,18 +1,29 @@
 [Unit]
 Description=AFCO ERP Django Backend
 After=network.target
+Requires=afco-report-server.service
 
 [Service]
 Type=simple
 User=ali
 Group=ali
 WorkingDirectory=/home/ali/development/afco_erp/backend
-Environment=PATH=/usr/bin:/usr/local/bin
+Environment=PATH=/usr/bin:/usr/local/bin:/home/ali/.local/bin
 Environment=PYTHONPATH=/home/ali/development/afco_erp/backend
-ExecStart=/usr/bin/python3 manage.py runserver 0.0.0.0:3500
+Environment=DJANGO_SETTINGS_MODULE=afco_erp.settings
+Environment=REPORT_SERVER_URL=http://localhost:3502
+ExecStartPre=/bin/sleep 10
+ExecStart=/home/ali/development/afco_erp/backend/venv/bin/python manage.py runserver 0.0.0.0:3501
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
-RestartSec=3
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=afco-backend
+
+# Health check
+TimeoutStartSec=60
+TimeoutStopSec=15
 
 [Install]
 WantedBy=multi-user.target

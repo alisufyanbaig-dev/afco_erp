@@ -3,7 +3,8 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
-from common.utils import APIResponse
+from django.http import HttpResponse
+from common.utils import APIResponse, get_report_client
 from common.models import UserActivity
 from .models import ChartOfAccounts, Voucher, VoucherLineEntry
 from .serializers import (
@@ -554,6 +555,86 @@ def trial_balance(request):
     except Exception as e:
         return APIResponse.error(
             message=f"Error generating trial balance: {str(e)}",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+def voucher_pdf_report(request, voucher_id):
+    """
+    Generate PDF report for a specific voucher.
+    """
+    try:
+        user = request.user
+        user_activity = UserActivity.objects.get(user=user)
+        
+        if not user_activity.current_company or not user_activity.current_financial_year:
+            return APIResponse.error(
+                message="No company or financial year activated. Please activate both first.",
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get the voucher
+        try:
+            voucher = Voucher.objects.get(
+                id=voucher_id,
+                company=user_activity.current_company,
+                financial_year=user_activity.current_financial_year
+            )
+        except Voucher.DoesNotExist:
+            return APIResponse.error(
+                message="Voucher not found or not accessible",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Prepare voucher data for report server
+        line_entries = []
+        for entry in voucher.line_entries.all():
+            line_entries.append({
+                'accountCode': entry.account.code,
+                'accountName': entry.account.name,
+                'description': entry.description or '',
+                'debitAmount': float(entry.debit_amount),
+                'creditAmount': float(entry.credit_amount)
+            })
+        
+        voucher_data = {
+            'voucherNumber': voucher.voucher_number,
+            'voucherType': voucher.get_voucher_type_display(),
+            'voucherDate': voucher.voucher_date.isoformat(),
+            'narration': voucher.narration or '',
+            'reference': voucher.reference or '',
+            'companyName': voucher.company.name,
+            'financialYear': voucher.financial_year.name,
+            'lineEntries': line_entries,
+            'totalDebit': float(sum(entry.debit_amount for entry in voucher.line_entries.all())),
+            'totalCredit': float(sum(entry.credit_amount for entry in voucher.line_entries.all())),
+            'createdBy': voucher.created_by.get_full_name() if voucher.created_by else 'Unknown',
+            'createdAt': voucher.created_at.isoformat()
+        }
+        
+        # Call report server
+        report_client = get_report_client()
+        success, pdf_bytes, error_message = report_client.generate_voucher_pdf(voucher_data)
+        
+        if success:
+            response = HttpResponse(pdf_bytes, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="voucher_{voucher.voucher_number}.pdf"'
+            return response
+        else:
+            return APIResponse.error(
+                message=f"Failed to generate PDF report: {error_message}",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    except UserActivity.DoesNotExist:
+        return APIResponse.error(
+            message="User activity not found. Please activate a company and financial year first.",
+            status_code=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return APIResponse.error(
+            message=f"Error generating voucher PDF: {str(e)}",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
